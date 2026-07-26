@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   MousePointer2,
   Hand,
@@ -18,6 +18,7 @@ import {
   BrainCircuit,
   Keyboard,
   Download,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -32,13 +33,16 @@ interface Props {
   onOpenSidebar: () => void;
   onOpenShortcuts: () => void;
   onOpenExport: () => void;
+  onOpenSearch: () => void;
 }
 
-export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport }: Props) {
+export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
   const { tool, setTool } = useTool();
   const zoomBy = useMindMapStore((s) => s.zoomBy);
   const resetViewport = useMindMapStore((s) => s.resetViewport);
+  const fitToView = useMindMapStore((s) => s.fitToView);
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const past = useMindMapStore((s) => s.past);
@@ -58,9 +62,9 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       const cx = typeof window !== "undefined" ? window.innerWidth / 2 : 600;
       const cy = typeof window !== "undefined" ? window.innerHeight / 2 : 400;
       const vp = viewport;
-      const wx = (cx - vp.x) / vp.zoom - 90;
-      const wy = (cy - vp.y) / vp.zoom - 36;
-      addNode({ title: meta.label, kind, x: wx, y: wy });
+      const wx = (cx - vp.x) / vp.zoom - 100;
+      const wy = (cy - vp.y) / vp.zoom - 40;
+      addNode({ title: "Novo " + meta.label, kind, x: wx, y: wy, width: 200, height: 80 });
       setAddMenuOpen(false);
     },
     [addNode, viewport]
@@ -72,6 +76,25 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
     }
   }, [selectedNodeIds, deleteNode]);
 
+  // Close add-menu on outside click / Escape
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setAddMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAddMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [addMenuOpen]);
+
   const toolButtons: Array<{ toolId: string; icon: React.ReactNode; label: string }> = [
     { toolId: "select", icon: <MousePointer2 className="h-4 w-4" />, label: "Selecionar" },
     { toolId: "pan", icon: <Hand className="h-4 w-4" />, label: "Arrastar" },
@@ -79,7 +102,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   ];
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/80 backdrop-blur-md">
+    <div className="relative z-40 flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/80 backdrop-blur-md">
       {/* Left: sidebar toggle */}
       <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSidebar} title="Mapas">
         <BrainCircuit className="h-4 w-4" />
@@ -105,7 +128,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       <div className="h-5 w-px bg-border mx-1" />
 
       {/* Add node dropdown */}
-      <div className="relative">
+      <div className="relative" ref={addMenuRef}>
         <Button
           variant="ghost"
           size="sm"
@@ -117,23 +140,25 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
           <ChevronDown className="h-3 w-3" />
         </Button>
         {addMenuOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-xl p-2 min-w-[180px] fade-in">
+          <div className="absolute top-full left-0 mt-1.5 z-[100] bg-popover border border-border rounded-lg shadow-2xl p-1.5 min-w-[200px] fade-in backdrop-blur-xl">
+            <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo de nó</p>
             {Object.entries(NODE_KIND_META).map(([kind, meta]) => (
               <button
                 key={kind}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-accent text-xs transition-colors"
+                className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-accent text-xs transition-colors group"
                 onClick={() => {
                   handleAddNode(kind as NodeKind);
                   setAddMenuOpen(false);
                 }}
               >
                 <div
-                  className="h-5 w-5 rounded flex items-center justify-center"
+                  className="h-6 w-6 rounded-md flex items-center justify-center transition-transform group-hover:scale-110"
                   style={{ background: `${meta.color}22`, color: meta.color }}
                 >
                   <span className="text-[10px] font-bold">{meta.label[0]}</span>
                 </div>
-                <span>{meta.label}</span>
+                <span className="font-medium">{meta.label}</span>
+                <kbd className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{meta.label[0]}</kbd>
               </button>
             ))}
           </div>
@@ -170,8 +195,22 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(0.8)} title="Zoom−">
         <ZoomOut className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={resetViewport} title="Resetar visão">
+      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => fitToView(80)} title="Ajustar à tela (F)">
         <Maximize className="h-4 w-4" />
+      </Button>
+
+      {/* Search / Command palette */}
+      <button
+        onClick={onOpenSearch}
+        className="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-md border border-border bg-muted/40 hover:bg-accent hover:border-primary/40 transition-colors text-xs text-muted-foreground"
+        title="Buscar (Ctrl+K)"
+      >
+        <Search className="h-3.5 w-3.5" />
+        <span>Buscar...</span>
+        <kbd className="ml-2 text-[10px] bg-background px-1 py-0.5 rounded border border-border">⌘K</kbd>
+      </button>
+      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors md:hidden" onClick={onOpenSearch} title="Buscar (Ctrl+K)">
+        <Search className="h-4 w-4" />
       </Button>
 
       {/* Spacer */}

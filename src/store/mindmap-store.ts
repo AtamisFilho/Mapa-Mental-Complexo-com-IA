@@ -62,6 +62,8 @@ interface MindMapState {
   clearSelection: () => void;
   setHovered: (id: string | null) => void;
   focusNode: (id: string) => void;
+  fitToView: (padding?: number) => void;
+  toggleCollapse: (id: string) => void;
 
   // history
   pushHistory: () => void;
@@ -101,6 +103,8 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       nodes: map.nodes,
       edges: map.edges,
       dirty: false,
+      saving: false,
+      lastSavedAt: map.updatedAt ?? new Date().toISOString(),
       past: [],
       future: [],
       selectedNodeIds: [],
@@ -126,8 +130,8 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       image: partial.image ?? null,
       x: partial.x ?? 0,
       y: partial.y ?? 0,
-      width: partial.width ?? 180,
-      height: partial.height ?? 72,
+      width: partial.width ?? 200,
+      height: partial.height ?? 80,
       collapsed: partial.collapsed ?? false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -258,6 +262,54 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       selectedNodeIds: [id],
     });
   },
+
+  fitToView: (padding = 60) => {
+    const nodes = get().nodes;
+    if (nodes.length === 0) {
+      set({ viewport: { x: 0, y: 0, zoom: 1 } });
+      return;
+    }
+    const xs = nodes.map((n) => n.x);
+    const ys = nodes.map((n) => n.y);
+    const x2s = nodes.map((n) => n.x + n.width);
+    const y2s = nodes.map((n) => n.y + n.height);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...x2s);
+    const maxY = Math.max(...y2s);
+    const contentW = Math.max(1, maxX - minX);
+    const contentH = Math.max(1, maxY - minY);
+    const winW = typeof window !== "undefined" ? window.innerWidth : 1200;
+    const winH = typeof window !== "undefined" ? window.innerHeight : 700;
+    // Layout: toolbar (~44) on top, status (~28) + footer (~32) on bottom
+    const toolbarH = 44;
+    const bottomH = 60;
+    const canvasTop = toolbarH;
+    const canvasH = Math.max(200, winH - toolbarH - bottomH);
+    const canvasCenterY = canvasTop + canvasH / 2;
+    const availW = Math.max(200, winW - padding * 2);
+    const availH = Math.max(150, canvasH - padding * 2);
+    // Compute zoom but clamp so it stays readable
+    const rawZoom = Math.min(availW / contentW, availH / contentH);
+    const zoom = Math.min(2, Math.max(0.35, rawZoom));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    set({
+      viewport: {
+        x: winW / 2 - cx * zoom,
+        y: canvasCenterY - cy * zoom,
+        zoom,
+      },
+    });
+  },
+
+  toggleCollapse: (id) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, collapsed: !n.collapsed } : n
+      ),
+      dirty: true,
+    })),
 
   pushHistory: () =>
     set((s) => {

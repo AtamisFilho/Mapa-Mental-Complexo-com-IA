@@ -121,17 +121,17 @@ function layoutRadial(
   if (!root) {
     return nodes.map((n, i) => ({
       ...n,
-      x: (i % 5) * 220,
-      y: Math.floor(i / 5) * 120,
-      width: 180,
-      height: 72,
+      x: (i % 5) * 240,
+      y: Math.floor(i / 5) * 130,
+      width: 200,
+      height: 80,
     }));
   }
 
   const positions = new Map<string, { x: number; y: number; depth: number }>();
   positions.set(root.id, { x: 0, y: 0, depth: 0 });
 
-  const ringRadius = [0, 320, 560, 760, 920];
+  const ringRadius = [0, 260, 460, 620, 760];
   const queue: GenNode[] = [root];
   while (queue.length) {
     const cur = queue.shift()!;
@@ -167,10 +167,10 @@ function layoutRadial(
     const p = positions.get(n.id) ?? { x: 0, y: 0 };
     return {
       ...n,
-      x: Math.round(p.x),
-      y: Math.round(p.y),
-      width: 180,
-      height: 72,
+      x: Math.round(p.x - 100),
+      y: Math.round(p.y - 40),
+      width: 200,
+      height: 80,
     };
   });
 }

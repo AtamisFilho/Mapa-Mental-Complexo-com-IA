@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   X,
   Sparkles,
@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronRight,
   BrainCircuit,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,11 +34,12 @@ interface Props {
 
 export function AIPanel({ open, onClose }: Props) {
   const [tab, setTab] = useState<AITab>("expand");
-  const [loading, setLoading] = useState(false);
+  const [loading, loadingAction] = useState<null | string>(null);
   const [result, setResult] = useState<string | null>(null);
   const [topic, setTopic] = useState("");
   const [chatMessages, setChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [chatInput, setChatInput] = useState("");
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const nodes = useMindMapStore((s) => s.nodes);
   const edges = useMindMapStore((s) => s.edges);
@@ -58,7 +60,7 @@ export function AIPanel({ open, onClose }: Props) {
   // Expand selected node
   const handleExpand = useCallback(async () => {
     if (!selectedNode) return;
-    setLoading(true);
+    loadingAction("expand");
     setResult(null);
     try {
       const res = await fetch("/api/ai/expand", {
@@ -73,15 +75,16 @@ export function AIPanel({ open, onClose }: Props) {
       });
       const data = await res.json();
       if (data.nodes) {
-        // Position children around parent
         const children = data.nodes.map((n: { title: string; kind: string; content?: string }, i: number) => {
           const angle = (i / data.nodes.length) * Math.PI * 2 - Math.PI / 2;
           const radius = 280;
           return {
             ...n,
-            x: selectedNode.x + Math.cos(angle) * radius - 90,
-            y: selectedNode.y + Math.sin(angle) * radius - 36,
+            x: selectedNode.x + selectedNode.width / 2 + Math.cos(angle) * radius - 100,
+            y: selectedNode.y + selectedNode.height / 2 + Math.sin(angle) * radius - 40,
             parentId: selectedNode.id,
+            width: 200,
+            height: 80,
           };
         });
         const newIds: string[] = [];
@@ -99,13 +102,13 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão com a IA.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [selectedNode, nodes, mapTitle, thinking, addNode, addEdge]);
 
   // Generate full map from topic
   const handleGenerate = useCallback(async () => {
     if (!topic.trim()) return;
-    setLoading(true);
+    loadingAction("generate");
     setResult(null);
     try {
       const res = await fetch("/api/ai/generate", {
@@ -141,13 +144,13 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão com a IA.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [topic, thinking, mergeNodes, addEdge]);
 
   // Summarize subtree
   const handleSummarize = useCallback(async () => {
     if (!selectedNode) return;
-    setLoading(true);
+    loadingAction("summarize");
     setResult(null);
     try {
       // Get subtree nodes
@@ -177,12 +180,12 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão com a IA.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [selectedNode, nodes, edges, thinking]);
 
   // Suggest connections
   const handleSuggest = useCallback(async () => {
-    setLoading(true);
+    loadingAction("suggest");
     setResult(null);
     try {
       const existingPairs: Array<[string, string]> = edges.map((e) => [e.sourceId, e.targetId]);
@@ -210,7 +213,7 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão com a IA.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [nodes, edges, thinking]);
 
   // Chat
@@ -220,7 +223,7 @@ export function AIPanel({ open, onClose }: Props) {
     const newMessages = [...chatMessages, userMsg];
     setChatMessages(newMessages);
     setChatInput("");
-    setLoading(true);
+    loadingAction("chat");
     try {
       const mapContext = `Mapa: "${mapTitle}". Nós: ${nodes.slice(0, 20).map((n) => `${n.title}(${n.kind})`).join(", ")}. Arestas: ${edges.slice(0, 15).map((e) => `${nodes.find(n=>n.id===e.sourceId)?.title ?? e.sourceId}→${nodes.find(n=>n.id===e.targetId)?.title ?? e.targetId}`).join(", ")}`;
       const res = await fetch("/api/ai/chat", {
@@ -237,13 +240,20 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setChatMessages([...newMessages, { role: "assistant", content: "Erro de conexão." }]);
     }
-    setLoading(false);
+    loadingAction(null);
   }, [chatInput, chatMessages, mapTitle, nodes, edges, thinking]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, loading]);
 
   // Generate image for selected node
   const handleImage = useCallback(async () => {
     if (!selectedNode) return;
-    setLoading(true);
+    loadingAction("image");
     setResult(null);
     try {
       const res = await fetch("/api/ai/image", {
@@ -264,12 +274,12 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [selectedNode, updateNode]);
 
   // Auto-layout
   const handleLayout = useCallback(async () => {
-    setLoading(true);
+    loadingAction("layout");
     setResult(null);
     try {
       const res = await fetch("/api/ai/layout", {
@@ -296,7 +306,7 @@ export function AIPanel({ open, onClose }: Props) {
     } catch (e) {
       setResult("Erro de conexão.");
     }
-    setLoading(false);
+    loadingAction(null);
   }, [nodes, edges, updateNode]);
 
   if (!open) return null;
@@ -314,11 +324,13 @@ export function AIPanel({ open, onClose }: Props) {
   const effectiveTab = tabs.find((t) => t.id === tab && t.enabled) ? tab : tabs.find((t) => t.enabled)?.id ?? "expand";
 
   return (
-    <div className="w-[320px] bg-card border-l border-border flex flex-col shadow-lg fade-in">
+    <div className="w-[340px] bg-card border-l border-border flex flex-col shadow-2xl fade-in z-30">
       {/* header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-gradient-to-r from-primary/15 via-primary/5 to-transparent">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
-          <Sparkles className="h-4 w-4" />
+          <div className="h-6 w-6 rounded-md bg-primary/15 flex items-center justify-center">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+          </div>
           Inteligência Artificial
         </h3>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
@@ -327,134 +339,186 @@ export function AIPanel({ open, onClose }: Props) {
       </div>
 
       {/* tab buttons */}
-      <div className="flex flex-wrap gap-1 px-3 py-1.5 border-b border-border">
+      <div className="flex flex-wrap gap-1 px-2.5 py-2 border-b border-border bg-muted/30">
         {tabs.filter((t) => t.enabled).map((t) => (
-          <Button
+          <button
             key={t.id}
-            variant={effectiveTab === t.id ? "default" : "ghost"}
-            size="sm"
-            className="h-7 text-xs gap-1"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              effectiveTab === t.id
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            }`}
             onClick={() => { setTab(t.id); setResult(null); }}
           >
             {t.icon}
-            {t.label}
-          </Button>
+            <span className="hidden sm:inline">{t.label}</span>
+          </button>
         ))}
       </div>
 
-      <ScrollArea className="flex-1 p-3">
+      <ScrollArea className="flex-1">
+        <div className="p-3 flex flex-col gap-3">
         {/* Expand */}
         {effectiveTab === "expand" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
+          <>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Expande o nó selecionado em conceitos-filho gerados pela IA.
             </p>
             {selectedNode ? (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50">
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-accent/40 border border-border">
                 <div
-                  className="h-6 w-6 rounded flex items-center justify-center"
+                  className="h-7 w-7 rounded-md flex items-center justify-center shrink-0"
                   style={{ background: `${NODE_KIND_META[selectedNode.kind]?.color ?? "#10b981"}22`, color: NODE_KIND_META[selectedNode.kind]?.color ?? "#10b981" }}
                 >
                   <span className="text-[10px] font-bold">{selectedNode.title[0]}</span>
                 </div>
-                <span className="text-sm font-medium">{selectedNode.title}</span>
+                <span className="text-sm font-medium truncate">{selectedNode.title}</span>
               </div>
             ) : (
-              <p className="text-xs text-destructive">Selecione um nó primeiro.</p>
+              <p className="text-xs text-destructive bg-destructive/10 p-2 rounded-md">⚠ Selecione um nó primeiro.</p>
             )}
             <Button
               size="sm"
-              className="h-7 text-xs gap-1"
-              disabled={!selectedNode || loading}
+              className="h-8 text-xs gap-1.5 w-full"
+              disabled={!selectedNode || loading !== null}
               onClick={handleExpand}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Expand className="h-3 w-3" />}
+              {loading === "expand" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Expand className="h-3.5 w-3.5" />}
               Expandir nó
             </Button>
-          </div>
+          </>
         )}
 
         {/* Generate */}
         {effectiveTab === "generate" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
+          <>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Gera um mapa mental completo a partir de um tema.
             </p>
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && topic.trim() && !loading) handleGenerate(); }}
               placeholder="Ex: Arquitetura de microsserviços..."
-              className="h-8 text-sm"
+              className="h-9 text-sm"
             />
+            <div className="flex flex-wrap gap-1">
+              {["Inteligência Artificial", "Mudanças Climáticas", "Filosofia Grega", "Nutrição Humana"].map((s) => (
+                <button
+                  key={s}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted/40 hover:bg-accent hover:border-primary/40 text-muted-foreground transition-colors"
+                  onClick={() => setTopic(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
             <Button
               size="sm"
-              className="h-7 text-xs gap-1"
-              disabled={!topic.trim() || loading}
+              className="h-8 text-xs gap-1.5 w-full"
+              disabled={!topic.trim() || loading !== null}
               onClick={handleGenerate}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Map className="h-3 w-3" />}
+              {loading === "generate" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Map className="h-3.5 w-3.5" />}
               Gerar mapa
             </Button>
-          </div>
+          </>
         )}
 
         {/* Summarize */}
         {effectiveTab === "summarize" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
+          <>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Resume o ramo do nó selecionado em texto Markdown.
             </p>
             {selectedNode ? (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50">
-                <span className="text-sm font-medium">{selectedNode.title}</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-accent/40 border border-border">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-medium truncate">{selectedNode.title}</span>
               </div>
             ) : (
-              <p className="text-xs text-destructive">Selecione um nó primeiro.</p>
+              <p className="text-xs text-destructive bg-destructive/10 p-2 rounded-md">⚠ Selecione um nó primeiro.</p>
             )}
             <Button
               size="sm"
-              className="h-7 text-xs gap-1"
-              disabled={!selectedNode || loading}
+              className="h-8 text-xs gap-1.5 w-full"
+              disabled={!selectedNode || loading !== null}
               onClick={handleSummarize}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
-              Resumir
+              {loading === "summarize" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              Resumir subárvore
             </Button>
-          </div>
+          </>
         )}
 
         {/* Suggest */}
         {effectiveTab === "suggest" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
+          <>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Sugere conexões entre nós que ainda não estão ligados.
             </p>
+            <div className="rounded-lg bg-muted/30 border border-border p-2.5 text-xs text-muted-foreground">
+              <p className="flex items-center gap-1.5">
+                <Link2 className="h-3.5 w-3.5" />
+                <strong className="text-foreground">{nodes.length}</strong> nós · <strong className="text-foreground">{edges.length}</strong> conexões
+              </p>
+            </div>
             <Button
               size="sm"
-              className="h-7 text-xs gap-1"
-              disabled={nodes.length < 2 || loading}
+              className="h-8 text-xs gap-1.5 w-full"
+              disabled={nodes.length < 2 || loading !== null}
               onClick={handleSuggest}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+              {loading === "suggest" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
               Sugerir conexões
             </Button>
-          </div>
+          </>
         )}
 
         {/* Chat */}
         {effectiveTab === "chat" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-              Converse com a IA sobre o mapa mental.
-            </p>
-            <div className="flex flex-col gap-2 min-h-[200px] max-h-[400px] overflow-y-auto scroll-thin">
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Converse com a IA sobre o mapa.</p>
+              {chatMessages.length > 0 && (
+                <button
+                  className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                  onClick={() => setChatMessages([])}
+                  title="Limpar conversa"
+                >
+                  <Trash2 className="h-3 w-3" /> Limpar
+                </button>
+              )}
+            </div>
+            <div
+              ref={chatScrollRef}
+              className="flex flex-col gap-2 min-h-[240px] max-h-[420px] overflow-y-auto scroll-thin pr-1"
+            >
               {chatMessages.length === 0 && (
-                <p className="text-xs text-muted-foreground italic">Pergunte algo sobre seu mapa...</p>
+                <div className="text-center py-6">
+                  <BrainCircuit className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground italic">Pergunte algo sobre seu mapa...</p>
+                  <div className="mt-3 flex flex-col gap-1">
+                    {["Quais são os temas principais?", "Sugira melhorias para este mapa", "Explique o conceito de..."].map((q) => (
+                      <button
+                        key={q}
+                        className="text-[11px] px-2 py-1 rounded-md border border-border bg-muted/30 hover:bg-accent hover:border-primary/40 text-muted-foreground transition-colors text-left"
+                        onClick={() => setChatInput(q)}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {chatMessages.map((m, i) => (
                 <div
                   key={i}
-                  className={`p-2 rounded-md text-xs prose-mm ${m.role === "user" ? "bg-accent/50 ml-4" : "bg-muted mr-4"}`}
+                  className={`p-2.5 rounded-lg text-xs prose-mm ${
+                    m.role === "user"
+                      ? "bg-primary text-primary-foreground ml-6 rounded-br-sm"
+                      : "bg-muted mr-6 rounded-bl-sm"
+                  }`}
                 >
                   {m.role === "assistant" ? (
                     <ReactMarkdown>{m.content}</ReactMarkdown>
@@ -463,67 +527,82 @@ export function AIPanel({ open, onClose }: Props) {
                   )}
                 </div>
               ))}
+              {loading === "chat" && (
+                <div className="bg-muted mr-6 p-2.5 rounded-lg rounded-bl-sm flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.2s" }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.4s" }} />
+                  <span className="ml-1">IA pensando...</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-1.5">
               <Input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleChatSend(); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
                 placeholder="Pergunta..."
-                className="h-7 text-xs flex-1"
+                className="h-8 text-xs flex-1"
               />
-              <Button size="icon" className="h-7 w-7" disabled={loading || !chatInput.trim()} onClick={handleChatSend}>
+              <Button size="icon" className="h-8 w-8" disabled={loading !== null || !chatInput.trim()} onClick={handleChatSend}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          </>
         )}
 
         {/* Image */}
         {effectiveTab === "image" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
+          <>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Gera uma imagem ilustrativa para o nó selecionado.
             </p>
             {selectedNode ? (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50">
-                <span className="text-sm font-medium">{selectedNode.title}</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-accent/40 border border-border">
+                <ImagePlus className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-medium truncate">{selectedNode.title}</span>
               </div>
             ) : (
-              <p className="text-xs text-destructive">Selecione um nó primeiro.</p>
+              <p className="text-xs text-destructive bg-destructive/10 p-2 rounded-md">⚠ Selecione um nó primeiro.</p>
+            )}
+            {selectedNode?.image && (
+              <div className="rounded-lg overflow-hidden border border-border">
+                <img src={selectedNode.image} alt={selectedNode.title} className="w-full h-32 object-cover" />
+              </div>
             )}
             <Button
               size="sm"
-              className="h-7 text-xs gap-1"
-              disabled={!selectedNode || loading}
+              className="h-8 text-xs gap-1.5 w-full"
+              disabled={!selectedNode || loading !== null}
               onClick={handleImage}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImagePlus className="h-3 w-3" />}
-              Gerar imagem
+              {loading === "image" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+              {selectedNode?.image ? "Regenerar imagem" : "Gerar imagem"}
             </Button>
-          </div>
+          </>
         )}
 
         {/* Result display */}
         {result && (
-          <div className="mt-3 p-2 rounded-md bg-muted text-xs prose-mm">
+          <div className="mt-1 p-2.5 rounded-lg bg-primary/8 border border-primary/20 text-xs prose-mm">
             <ReactMarkdown>{result}</ReactMarkdown>
           </div>
         )}
+        </div>
       </ScrollArea>
 
       {/* Auto layout button */}
       {settings.ai.autoLayout && (
-        <div className="px-3 py-2 border-t border-border">
+        <div className="px-3 py-2.5 border-t border-border bg-muted/20">
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs gap-1 w-full"
-            disabled={nodes.length === 0 || loading}
+            className="h-8 text-xs gap-1.5 w-full hover:border-primary/40"
+            disabled={nodes.length === 0 || loading !== null}
             onClick={handleLayout}
           >
-            <LayoutGrid className="h-3 w-3" />
-            Auto-layout
+            {loading === "layout" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LayoutGrid className="h-3.5 w-3.5" />}
+            Reorganizar layout (auto-layout)
           </Button>
         </div>
       )}

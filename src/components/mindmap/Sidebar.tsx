@@ -108,77 +108,114 @@ export function Sidebar({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const relativeTime = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "agora";
+    if (min < 60) return `${min}min atrás`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h atrás`;
+    const day = Math.floor(hr / 24);
+    if (day < 7) return `${day}d atrás`;
+    return new Date(iso).toLocaleDateString("pt-BR");
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex">
       {/* backdrop */}
-      <div className="flex-1 bg-black/20" onClick={onClose} />
+      <div className="flex-1 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       {/* panel */}
-      <div className="w-[280px] bg-card border-l border-border flex flex-col shadow-xl fade-in">
+      <div className="w-[300px] bg-card border-l border-border flex flex-col shadow-2xl fade-in">
         {/* header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-gradient-to-r from-primary/15 via-primary/5 to-transparent">
           <h2 className="text-sm font-semibold flex items-center gap-1.5">
-            <FolderOpen className="h-4 w-4" />
-            Mapas
+            <FolderOpen className="h-4 w-4 text-primary" />
+            Meus Mapas
           </h2>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
         {/* search + new */}
-        <div className="flex items-center gap-1.5 px-3 py-2">
+        <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border bg-muted/20">
           <div className="flex-1 relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar..."
-              className="h-7 pl-7 text-xs"
+              placeholder="Buscar mapas..."
+              className="h-8 pl-8 text-xs"
             />
           </div>
-          <Button size="icon" className="h-7 w-7" onClick={handleNewMap} title="Novo mapa">
+          <Button size="icon" className="h-8 w-8" onClick={handleNewMap} title="Novo mapa">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
         {/* list */}
         <ScrollArea className="flex-1 px-2">
-          {loading && <p className="text-xs text-muted-foreground p-3">Carregando...</p>}
-          {filtered.length === 0 && !loading && (
-            <p className="text-xs text-muted-foreground p-3">Nenhum mapa encontrado.</p>
+          {loading && (
+            <div className="p-6 text-center">
+              <div className="inline-block h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-muted-foreground mt-2">Carregando...</p>
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="p-6 text-center">
+              <FolderOpen className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">
+                {search ? `Nenhum mapa para "${search}"` : "Nenhum mapa ainda. Crie o primeiro!"}
+              </p>
+            </div>
           )}
           <div className="flex flex-col gap-1 py-1">
-            {filtered.map((m) => (
-              <div
-                key={m.id}
-                className={`flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${
-                  m.id === mapId
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50"
-                }`}
-                onClick={() => handleOpenMap(m.id)}
-              >
-                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {m.nodeCount} nós · {new Date(m.updatedAt).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-                {m.starred && <Star className="h-3 w-3 fill-primary text-primary" />}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 shrink-0 hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteMap(m.id);
-                  }}
+            {filtered.map((m) => {
+              const isActive = m.id === mapId;
+              return (
+                <div
+                  key={m.id}
+                  className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-all border ${
+                    isActive
+                      ? "bg-accent border-primary/40 shadow-sm"
+                      : "border-transparent hover:bg-accent/50 hover:border-border"
+                  }`}
+                  onClick={() => handleOpenMap(m.id)}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+                  <div className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 ${isActive ? "bg-primary/15" : "bg-muted"}`}>
+                    {m.starred ? (
+                      <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                    ) : (
+                      <MapPin className={`h-3.5 w-3.5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-medium truncate ${isActive ? "text-foreground" : ""}`}>{m.title}</p>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <span>{m.nodeCount} nós</span>
+                      <span>·</span>
+                      <span>{relativeTime(m.updatedAt)}</span>
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteMap(m.id);
+                    }}
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </ScrollArea>
+        {/* footer count */}
+        <div className="px-3 py-2 border-t border-border bg-muted/20 text-[10px] text-muted-foreground">
+          {filtered.length} de {maps.length} mapa{maps.length !== 1 ? "s" : ""}
+        </div>
       </div>
     </div>
   );

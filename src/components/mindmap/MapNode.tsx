@@ -14,6 +14,8 @@ import {
   BookMarked,
   Target,
   GripVertical,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -36,6 +38,8 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
   const hovered = useMindMapStore((s) => s.hoveredNodeId === node.id);
   const selectNode = useMindMapStore((s) => s.selectNode);
   const setHovered = useMindMapStore((s) => s.setHovered);
+  const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+  const hasChildren = useMindMapStore((s) => s.edges.some((e) => e.sourceId === node.id));
 
   const animations = useSettingsStore((s) => s.settings.visual.animations);
   const autoColors = useSettingsStore((s) => s.settings.visual.autoColors);
@@ -108,50 +112,66 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
         {/* header */}
         <div className="flex items-start gap-2 pl-1.5">
           <div
-            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-transform group-hover:scale-110"
             style={{ background: `${accentColor}22`, color: accentColor }}
           >
             <Icon className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
             <p
-              className="text-sm font-semibold leading-snug break-words"
+              className="text-[13px] font-bold leading-snug break-words tracking-tight"
               style={{ color: "var(--foreground)" }}
             >
               {node.title}
             </p>
           </div>
+          {/* Collapse toggle (only if has children) */}
+          {hasChildren && (
+            <button
+              aria-label={node.collapsed ? "Expandir" : "Recolher"}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapse(node.id);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="shrink-0 h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title={node.collapsed ? "Expandir subárvore" : "Recolher subárvore"}
+            >
+              {node.collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          )}
           {node.collapsed && (
-            <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
               …
             </span>
           )}
         </div>
-        {node.content && (
+        {!node.collapsed && node.content && (
           <p className="pl-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-3 break-words">
             {node.content}
           </p>
         )}
-        {node.image && (
+        {!node.collapsed && node.image && (
           <div className="pl-1.5">
             <img
               src={node.image}
-              alt=""
+              alt={node.title}
               className="h-20 w-full rounded-md object-cover"
               style={{ borderRadius: radius }}
             />
           </div>
         )}
 
-        {/* connect handle (visible on hover) */}
+        {/* connect handle (visible on hover) — right side */}
         <button
-          aria-label="Conectar a outro nó"
+          aria-label="Conectar a partir deste nó"
           onPointerDown={(e) => {
             e.stopPropagation();
             onConnectHandle(e, node.id);
           }}
-          className="absolute -right-2 top-1/2 hidden h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border bg-background shadow-md transition group-hover:flex hover:scale-110"
+          className="absolute -right-2.5 top-1/2 hidden h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border-2 bg-background shadow-md transition-all group-hover:flex hover:scale-125"
           style={{ borderColor: accentColor, color: accentColor }}
+          title="Arraste para conectar"
         >
           <GripVertical className="h-3 w-3" />
         </button>

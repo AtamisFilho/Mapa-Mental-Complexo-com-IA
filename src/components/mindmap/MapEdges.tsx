@@ -108,30 +108,30 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             d={p.d}
             fill="none"
             stroke={p.color}
-            strokeWidth={p.selected ? 3 : 1.8}
+            strokeWidth={p.selected ? 3.5 : 2.4}
             strokeDasharray={p.dash}
             strokeLinecap="round"
-            opacity={p.selected ? 1 : 0.55}
+            opacity={p.selected ? 1 : 0.75}
             style={{ transition: "stroke-width 0.12s ease, opacity 0.12s ease" }}
           />
           {p.label && (
             <g>
               <rect
-                x={p.mx - (p.label.length * 3.4 + 8)}
-                y={p.my - 9}
-                width={p.label.length * 6.8 + 16}
-                height={18}
-                rx={9}
+                x={p.mx - (p.label.length * 3.6 + 9)}
+                y={p.my - 10}
+                width={p.label.length * 7.2 + 18}
+                height={20}
+                rx={10}
                 fill="var(--node-bg)"
-                stroke="var(--node-border)"
-                strokeWidth={1}
-                opacity={0.92}
+                stroke={p.color}
+                strokeWidth={1.2}
+                opacity={0.95}
               />
               <text
                 x={p.mx}
-                y={p.my + 3.5}
+                y={p.my + 4}
                 textAnchor="middle"
-                fontSize={10}
+                fontSize={11}
                 fill={p.color}
                 fontWeight={600}
                 style={{ pointerEvents: "none", userSelect: "none" }}

@@ -12,6 +12,7 @@ import { StatusBar } from "@/components/mindmap/StatusBar";
 import { ThemeManager } from "@/components/mindmap/ThemeManager";
 import { ShortcutsPanel } from "@/components/mindmap/ShortcutsPanel";
 import { ExportPanel } from "@/components/mindmap/ExportPanel";
+import { CommandPalette } from "@/components/mindmap/CommandPalette";
 import { useAutosave } from "@/hooks/use-autosave";
 import { ToolProvider } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -25,12 +26,14 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
 
   const mapId = useMindMapStore((s) => s.mapId);
   const loadMap = useMindMapStore((s) => s.loadMap);
   const nodes = useMindMapStore((s) => s.nodes);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
+  const fitToView = useMindMapStore((s) => s.fitToView);
 
   const minimapEnabled = useSettingsStore((s) => s.settings.visual.minimap);
 
@@ -65,6 +68,26 @@ export default function Home() {
     }
     init();
   }, [loadMap]);
+
+  // After the map loads, fit it to view (after a short delay to let layout settle)
+  useEffect(() => {
+    if (!loadingMap && nodes.length > 0) {
+      const t = setTimeout(() => fitToView(80), 80);
+      return () => clearTimeout(t);
+    }
+  }, [loadingMap, nodes.length, fitToView]);
+
+  // Global Ctrl+K to toggle command palette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setCommandPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Autosave hook
   useAutosave();
@@ -104,6 +127,7 @@ export default function Home() {
           onOpenSidebar={handleOpenSidebar}
           onOpenShortcuts={handleOpenShortcuts}
           onOpenExport={handleOpenExport}
+          onOpenSearch={() => setCommandPaletteOpen(true)}
         />
 
         {/* Main content area */}
@@ -141,11 +165,29 @@ export default function Home() {
         {/* Shortcuts overlay */}
         <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
+        {/* Command palette (Ctrl+K) */}
+        <CommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          onOpenAIPanel={handleOpenAIPanel}
+        />
+
         {/* Footer */}
-        <footer className="mt-auto border-t border-border px-4 py-2 bg-card/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="brand-gradient font-semibold">Mapa Mental Complexo com IA</span>
-            <div className="flex items-center gap-3">
+        <footer className="mt-auto border-t border-border px-4 py-2 bg-card/90 backdrop-blur-md">
+          <div className="flex items-center justify-between text-xs text-muted-foreground gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="brand-gradient font-semibold shrink-0">Mapa Mental Complexo com IA</span>
+              <span className="hidden sm:inline shrink-0">·</span>
+              <button
+                className="hidden sm:flex items-center gap-1 hover:text-primary transition-colors cursor-pointer shrink-0"
+                onClick={() => setCommandPaletteOpen(true)}
+                title="Abrir busca (Ctrl+K)"
+              >
+                <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Ctrl+K</kbd>
+                <span>buscar</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
               <button
                 className="hover:text-primary transition-colors cursor-pointer"
                 onClick={handleOpenExport}
@@ -153,7 +195,8 @@ export default function Home() {
               >
                 Exportar
               </button>
-              <span>Powered by Z.ai</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">Powered by Z.ai</span>
             </div>
           </div>
         </footer>

@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
+import { NODE_KIND_META } from "@/lib/settings";
+import type { NodeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
 
@@ -16,6 +19,7 @@ interface Props {
 export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragType, setDragType] = useState<"node" | "pan" | null>(null);
   const dragRef = useRef<{
     type: "node" | "pan";
     nodeId?: string;
@@ -48,8 +52,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const gridSize = useSettingsStore((s) => s.settings.editor.gridSize);
   const confirmDelete = useSettingsStore((s) => s.settings.editor.confirmDelete);
   const undoRedo = useSettingsStore((s) => s.settings.editor.undoRedo);
+  const shortcutsEnabled = useSettingsStore((s) => s.settings.editor.keyboardShortcuts);
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
+  const fitToView = useMindMapStore((s) => s.fitToView);
 
   // Convert screen coords to world coords
   const screenToWorld = useCallback(
@@ -88,6 +94,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
           nodeStartY: 0,
         };
         setIsDragging(true);
+        setDragType("pan");
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
         return;
       }
@@ -126,6 +133,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         vpStartY: 0,
       };
       setIsDragging(true);
+      setDragType("node");
     },
     [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld]
   );
@@ -171,6 +179,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const handlePointerUp = useCallback(() => {
     dragRef.current = null;
     setIsDragging(false);
+    setDragType(null);
   }, []);
 
   // Wheel zoom
@@ -194,9 +203,11 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       const world = screenToWorld(e.clientX, e.clientY);
       const id = addNode({
         title: "Novo conceito",
-        x: snap(world.x - 90),
-        y: snap(world.y - 36),
+        x: snap(world.x - 100),
+        y: snap(world.y - 40),
         kind: "concept",
+        width: 200,
+        height: 80,
       });
       focusNode(id);
       onOpenNodeEditor();
@@ -207,14 +218,22 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!undoRedo) return;
+      // Skip if user is typing in an input/textarea/contenteditable
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        if (!undoRedo) return;
         e.preventDefault();
         undo();
+        return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) {
+        if (!undoRedo) return;
         e.preventDefault();
         redo();
+        return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedNodeIds.length > 0 && !confirmDelete) {
@@ -222,17 +241,69 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
             deleteNode(id);
           }
         }
+        return;
       }
       if (e.key === "Escape") {
         clearSelection();
         setConnectingFrom(null);
+        return;
+      }
+      if (!shortcutsEnabled) return;
+      // Fit to view
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        fitToView(80);
+        return;
+      }
+      // Add node shortcuts: C/P/A/I/R/O
+      const keyMap: Record<string, NodeKind> = {
+        c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
+      };
+      const k = e.key.toLowerCase();
+      if (keyMap[k]) {
+        e.preventDefault();
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const wx = (cx - viewport.x) / viewport.zoom - 100;
+        const wy = (cy - viewport.y) / viewport.zoom - 40;
+        addNode({ title: "Novo " + NODE_KIND_META[keyMap[k]].label, kind: keyMap[k], x: wx, y: wy, width: 200, height: 80 });
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, clearSelection, setConnectingFrom]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode]);
 
   const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
+
+  // Compute visible nodes: hide descendants of collapsed nodes
+  const visibleNodeIds = useMemo(() => {
+    const collapsedIds = new Set(nodes.filter((n) => n.collapsed).map((n) => n.id));
+    if (collapsedIds.size === 0) return null; // all visible
+    const hidden = new Set<string>();
+    // Build child map
+    const childrenOf = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // BFS from each collapsed node
+    const queue = [...collapsedIds];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!hidden.has(child)) {
+          hidden.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    return hidden;
+  }, [nodes, edges]);
+
+  const visibleNodes = visibleNodeIds ? nodes.filter((n) => !visibleNodeIds.has(n.id)) : nodes;
+  const visibleEdges = visibleNodeIds
+    ? edges.filter((e) => !visibleNodeIds.has(e.sourceId) && !visibleNodeIds.has(e.targetId))
+    : edges;
 
   return (
     <div
@@ -241,7 +312,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       className={`relative flex-1 overflow-hidden ${bgClass}`}
       style={{
         cursor:
-          isDragging && dragRef.current?.type === "pan"
+          isDragging && dragType === "pan"
             ? "grabbing"
             : tool === "pan"
               ? "grab"
@@ -270,13 +341,13 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         }}
       >
         <MapEdges
-          nodes={nodes}
-          edges={edges}
+          nodes={visibleNodes}
+          edges={visibleEdges}
           connectingFrom={connectingFrom}
           cursorWorld={cursorWorld}
         />
         <AnimatePresence>
-          {nodes.map((node) => (
+          {visibleNodes.map((node) => (
             <MapNodeView
               key={node.id}
               node={node}
@@ -290,9 +361,21 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       {/* Empty state hint */}
       {nodes.length === 0 && !isDragging && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center opacity-50">
-            <p className="text-sm text-muted-foreground">Clique duplo para adicionar um nó</p>
-            <p className="text-xs text-muted-foreground mt-1">ou use o botão "Adicionar" na barra</p>
+          <div className="text-center max-w-md px-6">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-primary" />
+            </div>
+            <p className="text-lg font-semibold brand-gradient mb-1">Comece seu mapa mental</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Clique duplo no canvas para adicionar um nó, ou use o botão <strong className="text-foreground">Adicionar</strong> na barra.
+            </p>
+            <div className="flex flex-wrap gap-1.5 justify-center text-[10px] text-muted-foreground">
+              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">C</kbd> Conceito
+              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta
+              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação
+              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia
+              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar
+            </div>
           </div>
         </div>
       )}
@@ -315,5 +398,3 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     </div>
   );
 }
-
-import { useState } from "react";
