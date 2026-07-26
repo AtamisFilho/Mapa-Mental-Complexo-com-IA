@@ -28,8 +28,8 @@ export function Minimap() {
   const scale = useMemo(() => {
     const w = bounds.maxX - bounds.minX;
     const h = bounds.maxY - bounds.minY;
-    const mapW = 160;
-    const mapH = 120;
+    const mapW = 170;
+    const mapH = 110;
     return Math.min(mapW / w, mapH / h);
   }, [bounds]);
 
@@ -57,10 +57,14 @@ export function Minimap() {
 
   return (
     <div
-      className="absolute bottom-3 right-3 w-[160px] h-[120px] bg-card/90 border border-border rounded-lg shadow-lg overflow-hidden cursor-pointer backdrop-blur-sm"
+      className="absolute bottom-3 right-3 w-[170px] rounded-lg shadow-lg overflow-hidden cursor-pointer backdrop-blur-md border border-border bg-card/90 fade-in"
       onClick={handleMinimapClick}
     >
-      <svg width="160" height="120" style={{ pointerEvents: "none" }}>
+      <div className="flex items-center justify-between px-2 py-1 border-b border-border/60 bg-gradient-to-r from-primary/10 to-transparent">
+        <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Minimap</span>
+        <span className="text-[9px] text-muted-foreground tabular-nums">{Math.round(viewport.zoom * 100)}%</span>
+      </div>
+      <svg width="170" height="110" style={{ pointerEvents: "none" }}>
         {/* edges as thin lines */}
         {edges.map((e) => {
           const s = nodes.find((n) => n.id === e.sourceId);

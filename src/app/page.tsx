@@ -13,6 +13,8 @@ import { ThemeManager } from "@/components/mindmap/ThemeManager";
 import { ShortcutsPanel } from "@/components/mindmap/ShortcutsPanel";
 import { ExportPanel } from "@/components/mindmap/ExportPanel";
 import { CommandPalette } from "@/components/mindmap/CommandPalette";
+import { FloatingToolbar } from "@/components/mindmap/FloatingToolbar";
+import { OnboardingTour, replayTour } from "@/components/mindmap/OnboardingTour";
 import { useAutosave } from "@/hooks/use-autosave";
 import { ToolProvider } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -28,6 +30,7 @@ export default function Home() {
   const [exportOpen, setExportOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
+  const [tourForceShow, setTourForceShow] = useState(false);
 
   const mapId = useMindMapStore((s) => s.mapId);
   const loadMap = useMindMapStore((s) => s.loadMap);
@@ -92,14 +95,18 @@ export default function Home() {
   // Autosave hook
   useAutosave();
 
-  // No effect for nodeEditorOpen — the Toolbar and Canvas callbacks handle opening
-
   const handleOpenNodeEditor = useCallback(() => setNodeEditorOpen(true), []);
   const handleOpenAIPanel = useCallback(() => setAiPanelOpen(true), []);
   const handleOpenSidebar = useCallback(() => setSidebarOpen(true), []);
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
   const handleOpenExport = useCallback(() => setExportOpen(true), []);
+  const handleReplayTour = useCallback(() => {
+    replayTour();
+    setTourForceShow(true);
+    // Reset after a tick so it can be re-triggered later
+    setTimeout(() => setTourForceShow(false), 100);
+  }, []);
 
   if (loadingMap) {
     return (
@@ -139,6 +146,9 @@ export default function Home() {
             onOpenAIPanel={handleOpenAIPanel}
           />
 
+          {/* Floating toolbar for selected node */}
+          <FloatingToolbar onOpenNodeEditor={handleOpenNodeEditor} />
+
           {/* Minimap overlay */}
           {minimapEnabled && nodes.length > 0 && <Minimap />}
 
@@ -150,7 +160,7 @@ export default function Home() {
             <AIPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
           )}
           {settingsOpen && (
-            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} onReplayTour={handleReplayTour} />
           )}
           {exportOpen && (
             <ExportPanel open={exportOpen} onClose={() => setExportOpen(false)} />
@@ -173,6 +183,9 @@ export default function Home() {
           onOpenAIPanel={handleOpenAIPanel}
           onOpenNodeEditor={handleOpenNodeEditor}
         />
+
+        {/* Onboarding tour */}
+        <OnboardingTour forceShow={tourForceShow} />
 
         {/* Footer */}
         <footer className="mt-auto border-t border-border px-4 py-2 bg-card/90 backdrop-blur-md">

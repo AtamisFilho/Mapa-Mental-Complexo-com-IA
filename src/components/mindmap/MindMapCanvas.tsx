@@ -391,6 +391,40 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     ? edges.filter((e) => !visibleNodeIds.has(e.sourceId) && !visibleNodeIds.has(e.targetId))
     : edges;
 
+  // Compute highlighted nodes (ancestors + descendants of selected nodes)
+  const highlightedNodeIds = useMemo(() => {
+    if (selectedNodeIds.length === 0) return new Set<string>();
+    const highlighted = new Set<string>();
+    // Build parent map and child map from edges
+    const parentOf = new Map<string, string>(); // child → parent
+    const childrenOf = new Map<string, string[]>(); // parent → children
+    for (const e of edges) {
+      parentOf.set(e.targetId, e.sourceId);
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // For each selected node, trace ancestors upward
+    for (const selId of selectedNodeIds) {
+      let current = parentOf.get(selId);
+      while (current) {
+        if (!selectedNodeIds.includes(current)) highlighted.add(current);
+        current = parentOf.get(current);
+      }
+    }
+    // For each selected node, trace descendants downward
+    const queue = [...selectedNodeIds];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!selectedNodeIds.includes(child) && !highlighted.has(child)) {
+          highlighted.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    return highlighted;
+  }, [selectedNodeIds, edges]);
+
   return (
     <div
       ref={containerRef}
@@ -439,6 +473,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
               node={node}
               onPointerDown={handleNodePointerDown}
               onConnectHandle={handleConnectHandle}
+              isHighlighted={highlightedNodeIds.has(node.id)}
             />
           ))}
         </AnimatePresence>

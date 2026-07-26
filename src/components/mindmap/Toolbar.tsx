@@ -21,6 +21,7 @@ import {
   Search,
   Edit3,
   Copy,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -39,6 +40,35 @@ interface Props {
   onOpenNodeEditor: () => void;
 }
 
+// Keyboard shortcut tooltip map
+const SHORTCUT_MAP: Record<string, string> = {
+  select: "V",
+  pan: "H",
+  connect: "L",
+  add: "A",
+  undo: "Ctrl+Z",
+  redo: "Ctrl+Y",
+  zoomIn: "+",
+  zoomOut: "−",
+  fitToView: "F",
+  search: "⌘K",
+  delete: "Del",
+  duplicate: "Ctrl+D",
+  edit: "E",
+  shortcuts: "?",
+  ai: "IA",
+  export: "⤓",
+  settings: "⚙",
+};
+
+function ToolTipBadge({ shortcut }: { shortcut: string }) {
+  return (
+    <kbd className="text-[9px] bg-muted/80 text-muted-foreground px-1 py-0.5 rounded border border-border/60 ml-1 shrink-0">
+      {shortcut}
+    </kbd>
+  );
+}
+
 export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
@@ -46,6 +76,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const zoomBy = useMindMapStore((s) => s.zoomBy);
   const resetViewport = useMindMapStore((s) => s.resetViewport);
   const fitToView = useMindMapStore((s) => s.fitToView);
+  const organizeLayout = useMindMapStore((s) => s.organizeLayout);
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const past = useMindMapStore((s) => s.past);
@@ -106,127 +137,134 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
     };
   }, [addMenuOpen]);
 
-  const toolButtons: Array<{ toolId: string; icon: React.ReactNode; label: string }> = [
-    { toolId: "select", icon: <MousePointer2 className="h-4 w-4" />, label: "Selecionar" },
-    { toolId: "pan", icon: <Hand className="h-4 w-4" />, label: "Arrastar" },
-    { toolId: "connect", icon: <Link2 className="h-4 w-4" />, label: "Conectar" },
+  const toolButtons: Array<{ toolId: string; icon: React.ReactNode; label: string; shortcut: string }> = [
+    { toolId: "select", icon: <MousePointer2 className="h-4 w-4" />, label: "Selecionar", shortcut: SHORTCUT_MAP.select },
+    { toolId: "pan", icon: <Hand className="h-4 w-4" />, label: "Arrastar", shortcut: SHORTCUT_MAP.pan },
+    { toolId: "connect", icon: <Link2 className="h-4 w-4" />, label: "Conectar", shortcut: SHORTCUT_MAP.connect },
   ];
 
+  const isToolActive = (toolId: string) => tool === toolId;
+
   return (
-    <div className="relative z-40 flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/80 backdrop-blur-md">
-      {/* Left: sidebar toggle */}
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSidebar} title="Mapas">
-        <BrainCircuit className="h-4 w-4" />
-      </Button>
-
-      {/* Separator */}
-      <div className="h-5 w-px bg-border mx-1" />
-
-      {/* Tools with active indicator */}
-      {toolButtons.map((tb) => (
-        <Button
-          key={tb.toolId}
-          variant={tool === tb.toolId ? "default" : "ghost"}
-          size="icon"
-          className="h-8 w-8 transition-all"
-          onClick={() => setTool(tb.toolId as "select" | "pan" | "connect")}
-          title={tb.label}
-        >
-          {tb.icon}
+    <div className="relative z-40 flex items-center gap-2 px-2 py-1.5 border-b border-border bg-card/80 backdrop-blur-md overflow-x-auto">
+      {/* Group 1: Sidebar toggle | Select, Pan, Connect tools */}
+      <span className="toolbar-group">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSidebar} title="Mapas">
+          <BrainCircuit className="h-4 w-4" />
         </Button>
-      ))}
+        <div className="h-4 w-px bg-border mx-0.5" />
+        {toolButtons.map((tb) => (
+          <Button
+            key={tb.toolId}
+            variant={isToolActive(tb.toolId) ? "default" : "ghost"}
+            size="icon"
+            className={`h-8 w-8 transition-all ${isToolActive(tb.toolId) ? "active-tool-ring" : ""}`}
+            onClick={() => setTool(tb.toolId as "select" | "pan" | "connect")}
+            title={`${tb.label} (${tb.shortcut})`}
+          >
+            {tb.icon}
+            {shortcutsEnabled && !isToolActive(tb.toolId) && (
+              <span className="absolute -top-1 -right-1 text-[8px] bg-muted text-muted-foreground rounded px-0.5 leading-none opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none" />
+            )}
+          </Button>
+        ))}
+      </span>
 
-      <div className="h-5 w-px bg-border mx-1" />
-
-      {/* Add node dropdown */}
-      <div className="relative" ref={addMenuRef}>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1 transition-colors"
-          onClick={() => setAddMenuOpen(!addMenuOpen)}
-        >
-          <PlusCircle className="h-4 w-4" />
-          <span className="text-xs hidden sm:inline">Adicionar</span>
-          <ChevronDown className="h-3 w-3" />
-        </Button>
-        {addMenuOpen && (
-          <div className="absolute top-full left-0 mt-1.5 z-[100] bg-popover border border-border rounded-lg shadow-2xl p-1.5 min-w-[200px] fade-in backdrop-blur-xl">
-            <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo de nó</p>
-            {Object.entries(NODE_KIND_META).map(([kind, meta]) => (
-              <button
-                key={kind}
-                className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-accent text-xs transition-colors group"
-                onClick={() => {
-                  handleAddNode(kind as NodeKind);
-                  setAddMenuOpen(false);
-                }}
-              >
-                <div
-                  className="h-6 w-6 rounded-md flex items-center justify-center transition-transform group-hover:scale-110"
-                  style={{ background: `${meta.color}22`, color: meta.color }}
+      {/* Group 2: Add node dropdown + Undo/Redo */}
+      <span className="toolbar-group">
+        <div className="relative" ref={addMenuRef}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 transition-colors"
+            onClick={() => setAddMenuOpen(!addMenuOpen)}
+            title="Adicionar nó"
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span className="text-xs hidden sm:inline">Adicionar</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+          {addMenuOpen && (
+            <div className="absolute top-full left-0 mt-1.5 z-[100] bg-popover border border-border rounded-lg shadow-2xl p-1.5 min-w-[200px] fade-in backdrop-blur-xl">
+              <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo de nó</p>
+              {Object.entries(NODE_KIND_META).map(([kind, meta]) => (
+                <button
+                  key={kind}
+                  className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-accent text-xs transition-colors group"
+                  onClick={() => {
+                    handleAddNode(kind as NodeKind);
+                    setAddMenuOpen(false);
+                  }}
                 >
-                  <span className="text-[10px] font-bold">{meta.label[0]}</span>
-                </div>
-                <span className="font-medium">{meta.label}</span>
-                <kbd className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{meta.label[0]}</kbd>
-              </button>
-            ))}
-          </div>
+                  <div
+                    className="h-6 w-6 rounded-md flex items-center justify-center transition-transform group-hover:scale-110"
+                    style={{ background: `${meta.color}22`, color: meta.color }}
+                  >
+                    <span className="text-[10px] font-bold">{meta.label[0]}</span>
+                  </div>
+                  <span className="font-medium">{meta.label}</span>
+                  <kbd className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{meta.label[0]}</kbd>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {undoRedoEnabled && (
+          <>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={undo} disabled={past.length === 0} title={`Desfazer (${SHORTCUT_MAP.undo})`}>
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={redo} disabled={future.length === 0} title={`Refazer (${SHORTCUT_MAP.redo})`}>
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </>
         )}
-      </div>
+      </span>
 
-      <div className="h-5 w-px bg-border mx-1" />
-
-      {/* Undo/Redo */}
-      {undoRedoEnabled && (
-        <>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={undo} disabled={past.length === 0} title="Desfazer (Ctrl+Z)">
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={redo} disabled={future.length === 0} title="Refazer (Ctrl+Y)">
-            <Redo2 className="h-4 w-4" />
-          </Button>
-          <div className="h-5 w-px bg-border mx-1" />
-        </>
-      )}
-
-      {/* Delete */}
+      {/* Selection actions (shown when nodes selected) */}
       {selectedNodeIds.length > 0 && (
-        <>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors" onClick={handleDeleteSelected} title="Excluir selecionados (Del)">
+        <span className="toolbar-group">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors" onClick={handleDeleteSelected} title={`Excluir selecionados (${SHORTCUT_MAP.delete})`}>
             <Trash2 className="h-4 w-4" />
+            <ToolTipBadge shortcut={SHORTCUT_MAP.delete} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={handleDuplicateSelected} title="Duplicar selecionado (Ctrl+D)">
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={handleDuplicateSelected} title={`Duplicar (${SHORTCUT_MAP.duplicate})`}>
             <Copy className="h-4 w-4" />
+            <ToolTipBadge shortcut={SHORTCUT_MAP.duplicate} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenNodeEditor} title="Editar nó (duplo-clique)">
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenNodeEditor} title={`Editar nó (${SHORTCUT_MAP.edit})`}>
             <Edit3 className="h-4 w-4" />
+            <ToolTipBadge shortcut={SHORTCUT_MAP.edit} />
           </Button>
-        </>
+        </span>
       )}
 
-      {/* Zoom */}
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(1.2)} title="Zoom+">
-        <ZoomIn className="h-4 w-4" />
-      </Button>
-      <span className="text-xs text-muted-foreground w-10 text-center tabular-nums">{Math.round(viewport.zoom * 100)}%</span>
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(0.8)} title="Zoom−">
-        <ZoomOut className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => fitToView(80)} title="Ajustar à tela (F)">
-        <Maximize className="h-4 w-4" />
-      </Button>
+      {/* Group 3: Zoom controls */}
+      <span className="toolbar-group">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(1.2)} title="Zoom+ (+)">
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <span className="text-xs text-muted-foreground w-10 text-center tabular-nums select-none">{Math.round(viewport.zoom * 100)}%</span>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(0.8)} title="Zoom− (−)">
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => fitToView(80)} title={`Ajustar à tela (${SHORTCUT_MAP.fitToView})`}>
+          <Maximize className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={organizeLayout} title="Organizar layout">
+          <LayoutGrid className="h-4 w-4" />
+        </Button>
+      </span>
 
-      {/* Search / Command palette */}
+      {/* Group 4: Search bar — more prominent */}
       <button
         onClick={onOpenSearch}
-        className="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-md border border-border bg-muted/40 hover:bg-accent hover:border-primary/40 transition-colors text-xs text-muted-foreground"
+        className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-lg border border-border bg-muted/40 hover:bg-accent transition-colors text-sm text-muted-foreground brand-gradient-focus"
         title="Buscar (Ctrl+K)"
       >
-        <Search className="h-3.5 w-3.5" />
-        <span>Buscar...</span>
-        <kbd className="ml-2 text-[10px] bg-background px-1 py-0.5 rounded border border-border">⌘K</kbd>
+        <Search className="h-4 w-4" />
+        <span className="font-medium">Buscar...</span>
+        <kbd className="ml-3 text-[10px] bg-background px-1.5 py-0.5 rounded border border-border font-mono">⌘K</kbd>
       </button>
       <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors md:hidden" onClick={onOpenSearch} title="Buscar (Ctrl+K)">
         <Search className="h-4 w-4" />
@@ -235,30 +273,26 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Shortcuts */}
-      {shortcutsEnabled && (
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenShortcuts} title="Atalhos de teclado">
-          <Keyboard className="h-4 w-4" />
+      {/* Group 5: Shortcuts, AI, Export, Settings */}
+      <span className="toolbar-group">
+        {shortcutsEnabled && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenShortcuts} title="Atalhos de teclado">
+            <Keyboard className="h-4 w-4" />
+          </Button>
+        )}
+        {aiEnabled && (
+          <Button variant="ghost" size="sm" className="h-8 gap-1 transition-colors" onClick={onOpenAIPanel} title="IA">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-xs hidden sm:inline">IA</span>
+          </Button>
+        )}
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenExport} title="Exportar">
+          <Download className="h-4 w-4" />
         </Button>
-      )}
-
-      {/* AI */}
-      {aiEnabled && (
-        <Button variant="ghost" size="sm" className="h-8 gap-1 transition-colors" onClick={onOpenAIPanel} title="IA">
-          <Sparkles className="h-4 w-4" />
-          <span className="text-xs hidden sm:inline">IA</span>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSettings} title="Configurações">
+          <Settings2 className="h-4 w-4" />
         </Button>
-      )}
-
-      {/* Export */}
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenExport} title="Exportar">
-        <Download className="h-4 w-4" />
-      </Button>
-
-      {/* Settings */}
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSettings} title="Configurações">
-        <Settings2 className="h-4 w-4" />
-      </Button>
+      </span>
     </div>
   );
 }

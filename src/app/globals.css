@@ -137,11 +137,11 @@
   }
 }
 
-/* Canvas dot grid background */
+/* Canvas dot grid background — softer, more visible dot pattern */
 .canvas-grid-bg {
   background-color: var(--canvas-bg);
-  background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(circle, var(--canvas-grid) 1.4px, transparent 1.4px);
+  background-size: 28px 28px;
   background-position: 0 0;
 }
 
@@ -221,3 +221,94 @@
 .prose-mm code { background: var(--muted); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.88em; }
 .prose-mm strong { font-weight: 600; }
 .prose-mm blockquote { border-left: 3px solid var(--primary); padding-left: 0.8em; opacity: 0.85; margin: 0.5em 0; }
+
+/* ── New utility classes ──────────────────────────── */
+
+/* Node entrance pulse animation (scale + opacity, 2s ease-out) */
+.node-pulse {
+  animation: node-pulse-anim 2s ease-out forwards;
+}
+@keyframes node-pulse-anim {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* SVG-compatible glow filter reference (used inside <svg> elements) */
+.edge-glow {
+  filter: url(#edgeGlowFilter);
+}
+
+/* Animated glow ring for active toolbar buttons */
+.active-tool-ring {
+  box-shadow: 0 0 0 2px var(--primary), 0 0 10px 2px var(--ring);
+  animation: tool-ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tool-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 0 8px 1px var(--ring); }
+  50% { box-shadow: 0 0 0 2.5px var(--primary), 0 0 14px 3px var(--ring); }
+}
+
+/* Brand gradient focus border (for search bar and inputs) */
+.brand-gradient-focus:focus {
+  border-color: transparent;
+  border-image: linear-gradient(120deg, var(--primary), oklch(0.7 0.18 190), var(--primary)) 1;
+  outline: none;
+  box-shadow: 0 0 8px 1px var(--ring);
+}
+
+/* Styled badge/pill for counts */
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.pill-badge--accent {
+  border-left: 3px solid var(--primary);
+  padding-left: 0.375rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Chain highlight glow for connected selected nodes */
+.chain-highlight {
+  box-shadow: 0 0 0 1.5px oklch(0.7 0.15 160 / 0.45), 0 0 16px 2px oklch(0.7 0.15 160 / 0.25);
+}
+
+/* Micro hover scale (1.02x) with smooth transition */
+.micro-hover-scale {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.micro-hover-scale:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* Animated dash pattern for selected/highlighted edges */
+.edge-animated-dash {
+  stroke-dashoffset: 0;
+  animation: edge-dash-flow 0.8s linear infinite;
+}
+@keyframes edge-dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+/* Toolbar group container */
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}

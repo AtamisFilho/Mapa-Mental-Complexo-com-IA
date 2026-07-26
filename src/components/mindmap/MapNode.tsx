@@ -31,15 +31,27 @@ interface Props {
   node: MapNodeType;
   onPointerDown: (e: React.PointerEvent, id: string) => void;
   onConnectHandle: (e: React.PointerEvent, id: string) => void;
+  isHighlighted?: boolean;
 }
 
-function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
+function MapNodeComponent({ node, onPointerDown, onConnectHandle, isHighlighted }: Props) {
   const selected = useMindMapStore((s) => s.selectedNodeIds.includes(node.id));
   const hovered = useMindMapStore((s) => s.hoveredNodeId === node.id);
   const selectNode = useMindMapStore((s) => s.selectNode);
   const setHovered = useMindMapStore((s) => s.setHovered);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
   const hasChildren = useMindMapStore((s) => s.edges.some((e) => e.sourceId === node.id));
+  // Check if any selected node is directly connected to this node (for chain highlight)
+  const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
+  const edges = useMindMapStore((s) => s.edges);
+  const isChainConnected = (() => {
+    if (!selected || selectedNodeIds.length <= 1) return false;
+    return edges.some(
+      (e) =>
+        (e.sourceId === node.id && selectedNodeIds.includes(e.targetId)) ||
+        (e.targetId === node.id && selectedNodeIds.includes(e.sourceId))
+    );
+  })();
 
   const animations = useSettingsStore((s) => s.settings.visual.animations);
   const autoColors = useSettingsStore((s) => s.settings.visual.autoColors);
@@ -51,6 +63,9 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
   const accentColor = node.color || (autoColors ? kindMeta.color : "var(--primary)");
 
   const radius = rounded ? "12px" : "4px";
+
+  // Gradient background: from node-bg to slightly lighter (dark theme) or slightly darker (light theme)
+  const gradientBg = `linear-gradient(135deg, var(--node-bg) 0%, color-mix(in oklch, var(--node-bg) 90%, var(--canvas-bg)) 100%)`;
 
   return (
     <motion.div
@@ -78,23 +93,39 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
         zIndex: selected ? 30 : hovered ? 20 : 10,
         touchAction: "none",
       }}
-      className="select-none group"
+      className={`select-none group micro-hover-scale ${
+        node.createdAt && Date.now() - new Date(node.createdAt).getTime() < 3000
+          ? "node-pulse"
+          : ""
+      }`}
     >
       <div
         className={`relative flex flex-col gap-1.5 p-3 ${
           selected && glow ? "node-glow" : ""
+        } ${
+          isChainConnected ? "chain-highlight" : ""
+        } ${
+          isHighlighted && !selected ? "chain-highlight" : ""
         }`}
         style={{
-          background: "var(--node-bg)",
-          border: `1.5px solid ${selected ? accentColor : "var(--node-border)"}`,
+          background: gradientBg,
+          border: `1.5px solid ${
+            selected
+              ? accentColor
+              : isHighlighted
+                ? `color-mix(in oklch, ${accentColor} 40%, var(--node-border))`
+                : "var(--node-border)"
+          }`,
           borderRadius: radius,
           boxShadow: selected
             ? `0 8px 28px rgba(0,0,0,0.16)`
-            : "var(--node-shadow)",
+            : hovered
+              ? `0 6px 18px rgba(0,0,0,0.10)`
+              : "var(--node-shadow)",
           transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         }}
       >
-        {/* accent stripe */}
+        {/* accent stripe — 5px wide with subtle glow */}
         <div
           aria-hidden
           style={{
@@ -102,12 +133,15 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
             left: 0,
             top: 0,
             bottom: 0,
-            width: 4,
+            width: 5,
             background: accentColor,
             borderTopLeftRadius: radius,
             borderBottomLeftRadius: radius,
             opacity: selected || hovered ? 1 : 0.55,
-            transition: "opacity 0.15s ease",
+            boxShadow: selected || hovered
+              ? `0 0 8px 2px ${accentColor}40`
+              : "none",
+            transition: "opacity 0.15s ease, box-shadow 0.15s ease",
           }}
         />
         {/* header */}

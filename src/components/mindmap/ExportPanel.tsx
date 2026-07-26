@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   X,
   Download,
@@ -10,6 +10,7 @@ import {
   Loader2,
   Copy,
   Check,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,15 +23,49 @@ interface Props {
   onClose: () => void;
 }
 
+// Validate imported JSON structure
+function validateImportJSON(data: unknown): { valid: boolean; error?: string } {
+  if (!data || typeof data !== "object") {
+    return { valid: false, error: "JSON deve ser um objeto." };
+  }
+  const obj = data as Record<string, unknown>;
+  if (!Array.isArray(obj.nodes)) {
+    return { valid: false, error: "Campo 'nodes' ausente ou não é um array." };
+  }
+  if (!Array.isArray(obj.edges)) {
+    return { valid: false, error: "Campo 'edges' ausente ou não é um array." };
+  }
+  for (const n of obj.nodes as Array<Record<string, unknown>>) {
+    if (!n.title || typeof n.title !== "string") {
+      return { valid: false, error: `Node sem 'title': ${JSON.stringify(n).slice(0, 60)}` };
+    }
+    if (n.kind && typeof n.kind !== "string") {
+      return { valid: false, error: `Node kind inválido: ${n.kind}` };
+    }
+  }
+  for (const e of obj.edges as Array<Record<string, unknown>>) {
+    if (!e.sourceId || !e.targetId) {
+      return { valid: false, error: `Edge sem 'sourceId' ou 'targetId': ${JSON.stringify(e).slice(0, 60)}` };
+    }
+  }
+  if (obj.nodes.length === 0) {
+    return { valid: false, error: "O mapa importado não tem nenhum nó." };
+  }
+  return { valid: true };
+}
+
 export function ExportPanel({ open, onClose }: Props) {
-  const [exporting, setExporting] = useState<null | "json" | "md" | "png" | "svg" | "copy">(null);
+  const [exporting, setExporting] = useState<null | "json" | "md" | "png" | "svg" | "copy" | "import">(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const nodes = useMindMapStore((s) => s.nodes);
   const edges = useMindMapStore((s) => s.edges);
   const title = useMindMapStore((s) => s.title);
   const viewport = useMindMapStore((s) => s.viewport);
+  const loadMap = useMindMapStore((s) => s.loadMap);
 
   const jsonEnabled = useSettingsStore((s) => s.settings.export.json);
   const mdEnabled = useSettingsStore((s) => s.settings.export.markdown);
@@ -140,7 +175,6 @@ export function ExportPanel({ open, onClose }: Props) {
   }, [title, nodes, edges, includeNotes, downloadBlob, safeName]);
 
   // Build an SVG string that embeds the nodes as styled foreignObject HTML.
-  // This lets us render the mind-map to PNG/SVG entirely on the client.
   const buildSVGString = useCallback((): string => {
     if (nodes.length === 0) {
       return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><text x="200" y="100" text-anchor="middle" fill="#888">Mapa vazio</text></svg>`;
@@ -282,6 +316,140 @@ export function ExportPanel({ open, onClose }: Props) {
     setExporting(null);
   }, [title, nodes, edges, viewport.zoom]);
 
+  // JSON Import handler
+  const handleImportJSON = useCallback(async () => {
+    setImportError(null);
+    // Trigger file input
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      // Reset input so the same file can be re-selected
+      e.target.value = "";
+
+      setExporting("import");
+      setMessage(null);
+      setImportError(null);
+
+      try {
+        const text = await file.text();
+        let data: unknown;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          setImportError("Arquivo JSON inválido — não foi possível parsear.");
+          setExporting(null);
+          return;
+        }
+
+        // Validate structure
+        const validation = validateImportJSON(data);
+        if (!validation.valid) {
+          setImportError(validation.error ?? "JSON inválido.");
+          setExporting(null);
+          return;
+        }
+
+        const obj = data as Record<string, unknown>;
+        const importNodes = obj.nodes as Array<Record<string, unknown>>;
+        const importEdges = obj.edges as Array<Record<string, unknown>>;
+        const importTitle = (obj.title as string) || "Mapa Importado";
+
+        // Transform nodes: strip IDs and only keep relevant fields for API
+        // Map old node IDs to their array index for edge resolution
+        const oldIdToIndex = new Map<string, number>();
+        const transformedNodes = importNodes.map((n, i) => {
+          // Store the old ID → index mapping
+          if (n.id && typeof n.id === "string") {
+            oldIdToIndex.set(n.id, i);
+          }
+          return {
+            title: n.title,
+            kind: n.kind ?? "concept",
+            x: typeof n.x === "number" ? n.x : 0,
+            y: typeof n.y === "number" ? n.y : 0,
+            width: typeof n.width === "number" ? n.width : 220,
+            height: typeof n.height === "number" ? n.height : 88,
+            content: n.content ?? null,
+            note: n.note ?? null,
+            color: n.color ?? null,
+          };
+        });
+
+        // Transform edges: resolve sourceId/targetId using old ID → index map
+        // If sourceId/targetId are already index strings ("0", "1", etc.), use them directly
+        const transformedEdges = importEdges.map((e) => {
+          let srcIdx: string;
+          let tgtIdx: string;
+          const srcId = String(e.sourceId);
+          const tgtId = String(e.targetId);
+
+          // Check if these are already numeric index strings
+          if (oldIdToIndex.has(srcId)) {
+            srcIdx = String(oldIdToIndex.get(srcId));
+          } else if (/^\d+$/.test(srcId) && parseInt(srcId) < importNodes.length) {
+            srcIdx = srcId;
+          } else {
+            srcIdx = "0"; // fallback
+          }
+
+          if (oldIdToIndex.has(tgtId)) {
+            tgtIdx = String(oldIdToIndex.get(tgtId));
+          } else if (/^\d+$/.test(tgtId) && parseInt(tgtId) < importNodes.length) {
+            tgtIdx = tgtId;
+          } else {
+            tgtIdx = "0"; // fallback
+          }
+
+          return {
+            sourceId: srcIdx,
+            targetId: tgtIdx,
+            label: e.label ?? null,
+            kind: e.kind ?? "related",
+          };
+        });
+
+        // POST to /api/maps
+        const res = await fetch("/api/maps", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: importTitle,
+            nodes: transformedNodes,
+            edges: transformedEdges,
+          }),
+        });
+
+        if (!res.ok) {
+          setImportError(`Erro do servidor (${res.status}). Tente novamente.`);
+          setExporting(null);
+          return;
+        }
+
+        const createData = await res.json();
+
+        // Load the full map
+        const mapRes = await fetch(`/api/maps/${createData.map.id}`);
+        if (!mapRes.ok) {
+          setImportError("Mapa criado, mas não foi possível carregar.");
+          setExporting(null);
+          return;
+        }
+        const mapData = await mapRes.json();
+        loadMap(mapData.map);
+        setMessage(`✅ Mapa "${importTitle}" importado com sucesso!`);
+        onClose();
+      } catch (err) {
+        setImportError(`Erro inesperado: ${(err as Error).message}`);
+      }
+      setExporting(null);
+    },
+    [loadMap, onClose]
+  );
+
   if (!open) return null;
 
   return (
@@ -289,7 +457,7 @@ export function ExportPanel({ open, onClose }: Props) {
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
           <Download className="h-4 w-4 text-primary" />
-          Exportar
+          Exportar / Importar
         </h3>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
           <X className="h-4 w-4" />
@@ -309,6 +477,43 @@ export function ExportPanel({ open, onClose }: Props) {
           </div>
 
           <div className="flex flex-col gap-2">
+            {/* IMPORT JSON card */}
+            <div className="group flex items-start gap-3 p-3 rounded-lg border border-primary/30 hover:border-primary/60 bg-primary/5 hover:bg-primary/10 transition-all text-left relative">
+              <div className="h-9 w-9 rounded-md bg-primary/15 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                {exporting === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Importar JSON</p>
+                <p className="text-xs text-muted-foreground">Carregar mapa de um arquivo .json</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 mt-2 text-xs gap-1"
+                  disabled={exporting !== null}
+                  onClick={handleImportJSON}
+                >
+                  <Upload className="h-3 w-3" />
+                  Selecionar arquivo
+                </Button>
+                <div className="mt-2 rounded-md bg-muted/50 p-2 text-[10px] text-muted-foreground leading-relaxed border border-border/50">
+                  <p className="font-medium text-foreground/80 mb-1">Formato esperado:</p>
+                  <pre className="whitespace-pre-wrap font-mono">{`{ "title": "...", "nodes": [{ "title": "...", "kind": "concept", "x": 0, "y": 0 }], "edges": [{ "sourceId": "n-id-1", "targetId": "n-id-2" }] }`}</pre>
+                </div>
+                {importError && (
+                  <div className="mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+                    {importError}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {pngEnabled && (
               <button
                 className="group flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-accent/40 transition-all text-left"
@@ -388,7 +593,7 @@ export function ExportPanel({ open, onClose }: Props) {
             </button>
           </div>
 
-          {message && (
+          {message && !importError && (
             <div className="mt-1 p-2.5 rounded-md bg-primary/10 border border-primary/20 text-xs text-foreground">
               {message}
             </div>

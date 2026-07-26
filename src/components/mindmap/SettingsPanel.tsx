@@ -13,6 +13,7 @@ import {
   Moon,
   Monitor,
   Check,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -24,6 +25,7 @@ import { SETTING_CATEGORIES, ACCENT_PALETTES, type FeatureSettings } from "@/lib
 interface Props {
   open: boolean;
   onClose: () => void;
+  onReplayTour?: () => void;
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -34,7 +36,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   export: <Download className="h-3.5 w-3.5" />,
 };
 
-export function SettingsPanel({ open, onClose }: Props) {
+export function SettingsPanel({ open, onClose, onReplayTour }: Props) {
   const settings = useSettingsStore((s) => s.settings);
   const setToggle = useSettingsStore((s) => s.setToggle);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
@@ -117,6 +119,14 @@ export function SettingsPanel({ open, onClose }: Props) {
                   </button>
                 ))}
               </div>
+            {/* Repetir tour button */}
+            <button
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-accent/40 transition-colors text-xs text-muted-foreground hover:text-foreground w-full"
+              onClick={onReplayTour}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              Repetir tour de introdução
+            </button>
             </div>
           </div>
 

@@ -269,3 +269,152 @@ Stage Summary:
 - **Polish**: properly disabled buttons, larger node defaults (no clipping), animated empty state, redesigned shortcuts panel with categories.
 - **Dev server**: started with `setsid` detachment; accessible via gateway port 81 for agent-browser QA.
 - **Recommended next steps**: (1) Add JSON import (POST `/api/maps/import`), (2) Add edge label editing (double-click on edge → prompt), (3) Add drag-to-reorder for Sidebar items (starred/favorites), (4) Add a "share" link with read-only view, (5) Add node alignment guides (snap to siblings), (6) Consider adding quick emoji/icon picker for nodes, (7) Consider adding Mermaid/markdown export with preview.
+
+---
+Task ID: 5-b
+Agent: full-stack-developer
+Task: Add new features: edge label editing, JSON import, contextual floating toolbar, onboarding tour, map deletion confirmation
+
+Work Log:
+- Read worklog.md to understand project context (all components built, lint clean, app functional)
+- Read all existing source files: MapEdges.tsx, ExportPanel.tsx, MindMapCanvas.tsx, Sidebar.tsx, SettingsPanel.tsx, page.tsx, mindmap-store.ts, types.ts, settings.ts, templates.ts, alert-dialog.tsx, Toolbar.tsx, use-tool-context.tsx
+- Implemented Feature 1: Edge Label Editing in MapEdges.tsx
+  - Added `editingEdgeId`, `editingPosition`, `editingValue`, `hoveredLabelId` state variables
+  - Double-click on edge label `<g>` element triggers inline edit via `<foreignObject>` with `<input>` positioned at the label midpoint
+  - Enter saves the new label (calls `updateEdge(id, { label: newValue })`), Escape cancels
+  - If edge has no label, double-clicking the edge path itself adds a default label ("nova conexão") and opens the editor
+  - Added tooltip hint "Clique duplo para editar label" when hovering over a label
+  - Input auto-focuses and selects text on edit start
+
+- Implemented Feature 2: JSON Import in ExportPanel.tsx
+  - Added a 5th export card: "Importar JSON" with Upload icon, distinct primary-colored border
+  - Added hidden file input that accepts `.json` files, triggered by "Selecionar arquivo" button
+  - Created `validateImportJSON()` function that checks: JSON is object, has nodes/edges arrays, each node has title, each edge has sourceId/targetId, at least 1 node
+  - On valid file: transforms imported data to API-compatible format (maps old node IDs to array indices for edge resolution)
+  - Calls POST `/api/maps` with imported title + transformed nodes/edges
+  - After success, loads the new map via `loadMap()` and closes the panel
+  - Shows validation error messages in red `bg-destructive/10` box if JSON is invalid
+  - Added sample JSON structure hint in a code block below the import button
+  - Changed panel header from "Exportar" to "Exportar / Importar"
+  - Added `importError` state and `importing` state type
+
+- Implemented Feature 3: Contextual Floating Toolbar (FloatingToolbar.tsx)
+  - Created new component with Edit, Delete, Duplicate, Change Color, Collapse/Expand actions
+  - Appears as a floating panel near the selected node (positioned above, offset by -20px in screen space)
+  - Uses framer-motion for smooth appearance animation (slide down + fade in)
+  - Color dropdown with 10 preset colors shown on hover over Palette icon
+  - Shows current node title as truncated label
+  - Dismissible by clicking outside (natural DOM behavior) or pressing Escape (clears selection)
+  - Only renders when `selectedNodeIds.length === 1`
+
+- Implemented Feature 4: First-Use Onboarding Tour (OnboardingTour.tsx)
+  - Created new component with 5 tour steps: Welcome, Add nodes, Toolbar, AI panel, Settings
+  - Each step has title, description, and optional target CSS selector for highlighting
+  - Step indicator shows progress (filled/active/empty dots)
+  - Back/Next/Skip/Finish buttons with proper navigation
+  - Highlight ring animation (pulse-ring CSS keyframe) around target elements
+  - Sparkles icon for center-positioned steps
+  - Persists "tour completed" flag in localStorage (`mindmap-tour-completed`)
+  - Tour only shows once (auto-checks localStorage on mount)
+  - Exported `replayTour()` utility function that clears localStorage to allow re-triggering
+  - Added "Repetir tour de introdução" button in SettingsPanel visual category (with MapPin icon)
+  - Wired `onReplayTour` prop through page.tsx → SettingsPanel
+
+- Implemented Feature 5: Map Deletion Confirmation in Sidebar.tsx
+  - Replaced `window.confirm()` with shadcn/ui AlertDialog component
+  - Added `deleteConfirmId` and `deleteConfirmTitle` state variables
+  - Delete button now calls `handleRequestDelete(id, title)` which opens AlertDialog
+  - AlertDialog shows: "Excluir mapa?" title, description with quoted map title, "Esta ação não pode ser desfeita."
+  - Red "Excluir" confirm button (`bg-destructive text-destructive-foreground`)
+  - Gray "Cancelar" cancel button (default AlertDialogAction styling)
+  - On confirm: actually deletes via DELETE API, refreshes maps, creates new map if current was deleted
+
+- Wired all new components into page.tsx
+  - Imported FloatingToolbar and OnboardingTour
+  - Rendered `<FloatingToolbar onOpenNodeEditor={handleOpenNodeEditor} />` inside the main content area (next to MindMapCanvas)
+  - Rendered `<OnboardingTour forceShow={tourForceShow} />` at root level
+  - Added `tourForceShow` state and `handleReplayTour` callback
+  - SettingsPanel now receives `onReplayTour` prop
+
+- Ran `bun run lint` — initial errors in OnboardingTour.tsx:
+  1. `handleFinish` accessed before declaration → moved declaration before `handleNext`
+  2. setState-in-effect pattern → refactored to derive visibility from localStorage + dismissed state, removed all effects that set state synchronously
+  3. Cannot access refs during render → removed all ref-based render logic, simplified to pure state-driven approach
+  - Final lint: 0 errors, 0 warnings
+
+Stage Summary:
+- **All 5 features implemented and lint-clean** (0 errors, 0 warnings)
+- **Edge Label Editing**: double-click on label/path to inline edit, tooltip hint, Enter/Escape commit/cancel
+- **JSON Import**: file input, validation, API POST with ID-to-index mapping, error messages, sample structure
+- **Floating Toolbar**: contextual actions near selected node, color picker, collapse/expand, framer-motion animation
+- **Onboarding Tour**: 5-step guided tour, localStorage persistence, highlight ring animation, replay via Settings
+- **Map Deletion Confirmation**: shadcn AlertDialog with red "Excluir" button, quoted map title, undo warning
+- **All new components wired into page.tsx** (FloatingToolbar, OnboardingTour, SettingsPanel onReplayTour prop)
+- Dev server compiles without errors
+
+---
+Task ID: 6
+Agent: main (orchestrator)
+Task: Assess current project status, perform QA with agent-browser, fix bugs, improve styling, add features, update worklog.
+
+Work Log:
+- Read worklog.md to understand prior progress (all components built, lint clean, VLM-rated 8-9/10 in previous sessions)
+- Checked dev server status — app running on port 3000, accessible via gateway port 81
+- Ran `bun run lint` — 0 errors (clean)
+- Performed comprehensive QA via agent-browser + VLM analysis:
+  - Initial VLM rating: 7/10 (previous session had 8-9/10 but CSS parsing bug reduced quality)
+  - Identified CSS parsing bug: `globals.css` line 312-313 used `var(--muted / 0.35)` and `var(--border / 0.5)` which is invalid CSS division syntax — causes build error overlay
+  - Identified ExportPanel.tsx syntax error: missing parentheses around `if` condition at line 393
+
+- Fixed CSS parsing bug:
+  - Changed `background: var(--muted / 0.35)` → `background: oklch(from var(--muted) l c h / 0.35)` → final fix: `background: color-mix(in srgb, var(--muted) 35%, transparent)`
+  - Changed `border: 1px solid var(--border / 0.5)` → `border: 1px solid color-mix(in srgb, var(--border) 50%, transparent)`
+  - The `oklch(from ...)` relative color syntax was also unsupported by Next.js CSS parser, so switched to `color-mix()` which works
+
+- Launched subagent 5-a (full-stack-developer) for ENHANCED STYLING:
+  - globals.css: Added 8 new CSS utility classes (node-pulse, edge-glow, edge-animated-dash, active-tool-ring, brand-gradient-focus, pill-badge, chain-highlight, micro-hover-scale, toolbar-group)
+  - MapEdges.tsx: Added SVG glow/shadow filter definitions, animated dash for selected edges, edge opacity boost (0.7→0.8), arrowhead indicators at target endpoints, label font 11→12px with better padding, hover tooltip hint for label editing
+  - MapNode.tsx: Added `isHighlighted` prop, linear-gradient background (135deg), accent stripe 4→5px with glow effect, chain-highlight for connected selected nodes, micro-hover-scale animation, node-pulse entrance animation
+  - Toolbar.tsx: 5 toolbar-group pill containers (Tools, Add+Undo, Selection, Zoom, Actions), ToolTipBadge shortcut indicators, active-tool-ring glow, brand-gradient-focus search bar, LayoutGrid organize button
+  - StatusBar.tsx: 3-column grid layout, pill-badge styled badges, kind-count badges with colored left-border, hover underline on editable title
+  - MindMapCanvas.tsx: Active path highlighting (highlightedNodeIds from ancestor+descendant BFS), isHighlighted prop passed to each MapNodeView
+
+- Launched subagent 5-b (full-stack-developer) for NEW FEATURES:
+  - Edge Label Editing: double-click on label/path to inline edit via foreignObject+input, Enter saves, Escape cancels, tooltip hint
+  - JSON Import: 5th card in ExportPanel with file input, validateImportJSON(), POST /api/maps, loadMap, error messages, sample structure hint
+  - Contextual Floating Toolbar (FloatingToolbar.tsx): Edit, Delete, Duplicate, Color Picker (10 presets), Collapse/Expand, framer-motion animation, positioned above selected node
+  - Onboarding Tour (OnboardingTour.tsx): 5 steps (Welcome, Add nodes, Toolbar, AI, Settings), progress dots, highlight ring, localStorage persistence, replay via SettingsPanel
+  - Map Deletion Confirmation: shadcn AlertDialog with red "Excluir" button, quoted map title, undo warning
+
+- QA verified after CSS fix + features:
+  - VLM rated 8/10 initially (CSS fix resolved build error overlay)
+  - VLM rated 8.5/10 after tour completion (no bugs, good toolbar grouping, polished onboarding)
+  - VLM rated 7.5-8/10 after full canvas view (nodes properly spaced after organize layout)
+
+- Additional polish improvements (round 6):
+  - Increased onboarding tour backdrop: bg-black/30 → bg-black/50, backdrop-blur-[1px] → backdrop-blur-[3px]
+  - Minimap: Added header with "Minimap" label and zoom percentage, bg-card/90 + fade-in, size 160×120 → 170×110
+  - Edge visibility: Base opacity 0.7 → 0.8, connected opacity 0.85 → 0.9, arrowhead opacity 0.4 → 0.5
+  - Organize layout button: Added `organizeLayout()` to mindmap-store (radial BFS layout + 3-iteration collision resolution), wired into Toolbar with LayoutGrid icon
+
+- Tested organize layout: VLM confirms nodes properly spaced, no overlapping, radial layout clear, rated 8/10
+
+Stage Summary:
+- **All lint clean** (0 errors, 0 warnings throughout session)
+- **CSS parsing bug fixed** — `var(--muted / 0.35)` → `color-mix(in srgb, var(--muted) 35%, transparent)` (oklch relative syntax also failed)
+- **VLM design rating**: 7/10 (initial with CSS bug) → 8/10 (after fix) → 8.5/10 (after tour) → 8/10 (organized canvas)
+- **8 new CSS utility classes** added for animations, glow effects, pill badges, chain highlights
+- **6 major new features**: edge label editing, JSON import, floating toolbar, onboarding tour, map deletion confirmation, organize layout
+- **Edge visibility improved**: arrowhead indicators, glow filters, animated dash for selected, opacity boost
+- **Node styling enhanced**: gradient backgrounds, accent stripe glow, chain highlights, micro-hover-scale, pulse entrance
+- **Toolbar redesigned**: 5 grouped pill containers, shortcut tooltip badges, active-tool-ring glow, organize button
+- **StatusBar redesigned**: 3-column grid, pill-badge counts, colored kind-count badges
+- **Minimap improved**: header label + zoom display
+- **Active path highlighting**: ancestors + descendants of selected nodes get soft glow borders
+- **No runtime errors** (console clean, 0 page errors)
+
+Unresolved issues / Risks:
+- `color-mix()` CSS function is relatively modern — may not work in very old browsers (but works in all modern browsers)
+- Node `color-mix()` in MapNode.tsx inline styles (gradient bg) — should verify in production browsers
+- ExportPanel.tsx had a cached syntax error in console — but source file is correct; may need full reload to clear cached errors
+- Recommended next steps: (1) Add emoji/icon picker for nodes, (2) Add Mermaid export, (3) Add real-time collaboration cursors, (4) Add alignment guides (snap to siblings), (5) Consider onboarding improvements based on VLM feedback

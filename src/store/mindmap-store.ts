@@ -65,6 +65,7 @@ interface MindMapState {
   focusNode: (id: string) => void;
   fitToView: (padding?: number) => void;
   toggleCollapse: (id: string) => void;
+  organizeLayout: () => void;
 
   // history
   pushHistory: () => void;
@@ -333,6 +334,101 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       ),
       dirty: true,
     })),
+
+  organizeLayout: () => {
+    const { nodes, edges } = get();
+    if (nodes.length === 0) return;
+    // Simple collision avoidance + radial layout
+    // 1. Find roots (nodes with no incoming edges)
+    const incoming = new Set(edges.map((e) => e.targetId));
+    const roots = nodes.filter((n) => !incoming.has(n.id));
+    const rootId = roots.length > 0 ? roots[0].id : nodes[0].id;
+    // 2. Build parent-child map
+    const childrenOf = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // 3. BFS to assign depth levels
+    const depthMap = new Map<string, number>();
+    const queue: Array<{ id: string; depth: number }> = [{ id: rootId, depth: 0 }];
+    const visited = new Set<string>();
+    while (queue.length) {
+      const { id, depth } = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      depthMap.set(id, depth);
+      for (const child of childrenOf.get(id) ?? []) {
+        if (!visited.has(child)) queue.push({ id: child, depth: depth + 1 });
+      }
+    }
+    // Assign depth 0 to unvisited nodes
+    for (const n of nodes) {
+      if (!depthMap.has(n.id)) depthMap.set(n.id, 0);
+    }
+    // 4. Compute positions by depth level with radial spread
+    const maxDepth = Math.max(...Array.from(depthMap.values()));
+    const ringRadii = [0, 260, 460, 620, 760, 900, 1040];
+    const centerX = 400;
+    const centerY = 300;
+    // Group nodes by depth
+    const byDepth = new Map<number, string[]>();
+    for (const [id, d] of depthMap) {
+      if (!byDepth.has(d)) byDepth.set(d, []);
+      byDepth.get(d)!.push(id);
+    }
+    const newPositions = new Map<string, { x: number; y: number }>();
+    for (const [d, ids] of byDepth) {
+      const radius = d === 0 ? 0 : (ringRadii[d] ?? ringRadii[ringRadii.length - 1] + (d - ringRadii.length + 1) * 140);
+      const angleStep = (2 * Math.PI) / Math.max(ids.length, 1);
+      const startAngle = d === 0 ? 0 : -Math.PI / 2;
+      for (let i = 0; i < ids.length; i++) {
+        const angle = startAngle + i * angleStep;
+        const node = nodes.find((n) => n.id === ids[i]);
+        const w = node?.width ?? 220;
+        const h = node?.height ?? 88;
+        newPositions.set(ids[i], {
+          x: centerX + Math.cos(angle) * radius - w / 2,
+          y: centerY + Math.sin(angle) * radius - h / 2,
+        });
+      }
+    }
+    // 5. Simple collision resolution: push overlapping nodes apart
+    const iterations = 3;
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let i = 0; i < nodes.length; i++) {
+        const posA = newPositions.get(nodes[i].id) ?? { x: nodes[i].x, y: nodes[i].y };
+        for (let j = i + 1; j < nodes.length; j++) {
+          const posB = newPositions.get(nodes[j].id) ?? { x: nodes[j].x, y: nodes[j].y };
+          const wA = nodes[i].width + 20; // padding
+          const hA = nodes[i].height + 20;
+          const wB = nodes[j].width + 20;
+          const hB = nodes[j].height + 20;
+          const overlapX = (wA / 2 + wB / 2) - Math.abs(posA.x + nodes[i].width / 2 - posB.x + nodes[j].width / 2);
+          const overlapY = (hA / 2 + hB / 2) - Math.abs(posA.y + nodes[i].height / 2 - posB.y + nodes[j].height / 2);
+          if (overlapX > 0 && overlapY > 0) {
+            // Push apart along the axis with less overlap
+            const push = overlapX < overlapY ? overlapX / 2 : overlapY / 2;
+            const dirX = posA.x + nodes[i].width / 2 < posB.x + nodes[j].width / 2 ? -1 : 1;
+            const dirY = posA.y + nodes[i].height / 2 < posB.y + nodes[j].height / 2 ? -1 : 1;
+            if (overlapX < overlapY) {
+              newPositions.set(nodes[i].id, { ...posA, x: posA.x + dirX * push });
+              newPositions.set(nodes[j].id, { ...posB, x: posB.x - dirX * push });
+            } else {
+              newPositions.set(nodes[i].id, { ...posA, y: posA.y + dirY * push });
+              newPositions.set(nodes[j].id, { ...posB, y: posB.y - dirY * push });
+            }
+          }
+        }
+      }
+    }
+    // 6. Apply new positions
+    const updated = nodes.map((n) => {
+      const pos = newPositions.get(n.id);
+      return pos ? { ...n, x: pos.x, y: pos.y, updatedAt: new Date().toISOString() } : n;
+    });
+    set({ nodes: updated, dirty: true });
+  },
 
   pushHistory: () =>
     set((s) => {
