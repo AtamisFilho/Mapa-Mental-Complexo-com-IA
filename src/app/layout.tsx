@@ -14,24 +14,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Mapa Mental Complexo com IA",
+  description: "Editor de mapas mentais complexos com inteligência artificial. Controle granular de features, temas, e capacidades de IA.",
+  keywords: ["mapa mental", "mind map", "IA", "AI", "Next.js", "TypeScript", "Z.ai"],
+  authors: [{ name: "Z.ai" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Mapa Mental Complexo com IA",
+    description: "Editor de mapas mentais com IA e controle granular",
     url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    siteName: "Mapa Mental IA",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Mapa Mental Complexo com IA",
+    description: "Editor de mapas mentais com IA e controle granular",
   },
 };
 

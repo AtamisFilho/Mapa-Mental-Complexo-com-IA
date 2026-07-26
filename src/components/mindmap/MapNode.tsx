@@ -134,7 +134,6 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
         )}
         {node.image && (
           <div className="pl-1.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={node.image}
               alt=""

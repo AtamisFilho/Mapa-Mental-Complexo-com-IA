@@ -18,6 +18,7 @@ model MindMap {
   tags        String?  // comma-separated
   starred     Boolean  @default(false)
   nodes       Node[]
+  edges       Edge[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -46,6 +47,7 @@ model Node {
 model Edge {
   id        String   @id @default(cuid())
   mapId     String
+  map       MindMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
   sourceId  String
   targetId  String
   label     String?
