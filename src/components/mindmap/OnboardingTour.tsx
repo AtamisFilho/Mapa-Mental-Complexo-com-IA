@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,25 +51,48 @@ interface Props {
   forceShow?: boolean;
 }
 
+// Synchronous external store for localStorage tour-completed flag.
+// Avoids setState-in-effect lint rule and SSR/hydration concerns.
+const tourCompletedStore = {
+  subscribe(cb: () => void) {
+    if (typeof window === "undefined") return () => {};
+    window.addEventListener("storage", cb);
+    return () => window.removeEventListener("storage", cb);
+  },
+  getSnapshot() {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(TOUR_KEY) === "true";
+  },
+  getServerSnapshot() {
+    return false;
+  },
+};
+
 export function OnboardingTour({ forceShow }: Props) {
   const [step, setStep] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissedLocal, setDismissedLocal] = useState(false);
+  // Read the localStorage flag using useSyncExternalStore — handles SSR + hydration safely
+  const tourCompleted = useSyncExternalStore(
+    tourCompletedStore.subscribe,
+    tourCompletedStore.getSnapshot,
+    tourCompletedStore.getServerSnapshot
+  );
 
-  // Show tour if: not dismissed AND (never completed OR forceShow requested)
-  const shouldShow = !dismissed && (forceShow || !localStorage.getItem(TOUR_KEY));
-
-  // When forceShow changes, reset step and dismissed state
-  // Use a key based on forceShow to effectively "reset" the component
-  const effectiveKey = forceShow ? "force" : "normal";
+  // Show tour if: not locally dismissed AND (forceShow requested OR never completed before)
+  const shouldShow = !dismissedLocal && (forceShow || !tourCompleted);
 
   const handleFinish = useCallback(() => {
-    localStorage.setItem(TOUR_KEY, "true");
-    setDismissed(true);
+    try {
+      localStorage.setItem(TOUR_KEY, "true");
+    } catch {}
+    setDismissedLocal(true);
   }, []);
 
   const handleSkip = useCallback(() => {
-    localStorage.setItem(TOUR_KEY, "true");
-    setDismissed(true);
+    try {
+      localStorage.setItem(TOUR_KEY, "true");
+    } catch {}
+    setDismissedLocal(true);
   }, []);
 
   const handleNext = useCallback(() => {
@@ -164,7 +187,7 @@ export function OnboardingTour({ forceShow }: Props) {
   if (!shouldShow) return null;
 
   return (
-    <AnimatePresence key={effectiveKey}>
+    <AnimatePresence key={forceShow ? "force" : "normal"}>
       {shouldShow && (
         <>
           {/* Overlay backdrop */}

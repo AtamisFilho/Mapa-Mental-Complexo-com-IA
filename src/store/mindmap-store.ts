@@ -10,6 +10,7 @@ import type {
   MindMapData,
 } from "@/lib/types";
 import type { SubtreeTemplateNode } from "@/lib/subtree-templates";
+import { computeLayout, type LayoutType } from "@/lib/layout-algorithms";
 
 interface HistoryEntry {
   nodes: MapNode[];
@@ -76,6 +77,7 @@ interface MindMapState {
   fitToView: (padding?: number) => void;
   toggleCollapse: (id: string) => void;
   organizeLayout: () => void;
+  applyLayout: (layoutType: LayoutType) => void;
 
   // subtree templates (Task 15-C)
   insertSubtree: (
@@ -484,6 +486,25 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       return pos ? { ...n, x: pos.x, y: pos.y, updatedAt: new Date().toISOString() } : n;
     });
     set({ nodes: updated, dirty: true });
+  },
+
+  applyLayout: (layoutType) => {
+    const { nodes, edges } = get();
+    if (nodes.length === 0) return;
+    // Snapshot current state so the layout change is a single undoable step.
+    get().pushHistory();
+    const results = computeLayout(layoutType, nodes, edges);
+    if (results.length === 0) return;
+    const posById = new Map(results.map((r) => [r.id, r]));
+    const updated = nodes.map((n) => {
+      const np = posById.get(n.id);
+      return np
+        ? { ...n, x: np.x, y: np.y, updatedAt: new Date().toISOString() }
+        : n;
+    });
+    set({ nodes: updated, dirty: true });
+    // Note: viewport intentionally left unchanged — user can press F / use
+    // "Ajustar à tela" to fit the new layout to the screen.
   },
 
   insertSubtree: (template, position, parentId) => {

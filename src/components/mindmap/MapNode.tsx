@@ -181,10 +181,10 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           }`,
           borderRadius: radius,
           boxShadow: selected
-            ? `0 0 0 1px ${accentColor}30, 0 12px 36px rgba(0,0,0,0.22)`
+            ? `0 0 0 1px ${accentColor}30, 0 12px 36px rgba(0,0,0,0.22), inset 0 1px 0 color-mix(in srgb, white 8%, transparent)`
             : hovered
-              ? `0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px ${accentColor}20`
-              : "var(--node-shadow)",
+              ? `0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px ${accentColor}20, inset 0 1px 0 color-mix(in srgb, white 6%, transparent)`
+              : `var(--node-shadow), inset 0 1px 0 color-mix(in srgb, white 4%, transparent)`,
           transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.2s ease",
         }}
       >
