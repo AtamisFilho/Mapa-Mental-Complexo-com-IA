@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
+import { useTool } from "@/hooks/use-tool-context";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
-import type { Tool } from "@/lib/types";
 
 interface Props {
   onOpenNodeEditor: () => void;
@@ -15,12 +15,9 @@ interface Props {
 
 export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<Tool>("select");
-  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
-  const [cursorWorld, setCursorWorld] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{
-    type: "node" | "pan" | "connect";
+    type: "node" | "pan";
     nodeId?: string;
     startX: number;
     startY: number;
@@ -29,6 +26,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     vpStartX: number;
     vpStartY: number;
   } | null>(null);
+
+  const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld } = useTool();
 
   const nodes = useMindMapStore((s) => s.nodes);
   const edges = useMindMapStore((s) => s.edges);
@@ -94,8 +93,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       }
       clearSelection();
       setConnectingFrom(null);
+      setCursorWorld(null);
     },
-    [tool, viewport, clearSelection]
+    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld]
   );
 
   // Node pointer down — start drag or connect
@@ -104,17 +104,14 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       e.stopPropagation();
       if (tool === "connect") {
         if (connectingFrom) {
-          // Second click — create edge
           addEdge(connectingFrom, id);
           setConnectingFrom(null);
           setCursorWorld(null);
         } else {
-          // First click — start connecting
           setConnectingFrom(id);
         }
         return;
       }
-      // Select + start drag
       const node = nodes.find((n) => n.id === id);
       if (!node) return;
       pushHistory();
@@ -130,7 +127,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       };
       setIsDragging(true);
     },
-    [tool, connectingFrom, nodes, addEdge, pushHistory]
+    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld]
   );
 
   // Connect handle pointer down
@@ -138,11 +135,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     (e: React.PointerEvent, id: string) => {
       e.stopPropagation();
       setConnectingFrom(id);
-      setTool("connect");
       const world = screenToWorld(e.clientX, e.clientY);
       setCursorWorld(world);
     },
-    [screenToWorld]
+    [screenToWorld, setConnectingFrom, setCursorWorld]
   );
 
   // Pointer move
@@ -168,7 +164,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         updateNode(d.nodeId, { x: newX, y: newY });
       }
     },
-    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld]
+    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld]
   );
 
   // Pointer up
@@ -221,25 +217,20 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         redo();
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedNodeIds.length > 0) {
-          if (confirmDelete) {
-            // We'll handle confirm in the node editor
-            return;
-          }
+        if (selectedNodeIds.length > 0 && !confirmDelete) {
           for (const id of selectedNodeIds) {
             deleteNode(id);
           }
         }
       }
+      if (e.key === "Escape") {
+        clearSelection();
+        setConnectingFrom(null);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode]);
-
-  // Expose tool setter for toolbar
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__mmSetTool = setTool;
-  }, []);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, clearSelection, setConnectingFrom]);
 
   const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
 
@@ -248,7 +239,18 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       ref={containerRef}
       data-canvas="true"
       className={`relative flex-1 overflow-hidden ${bgClass}`}
-      style={{ cursor: tool === "pan" ? "grab" : tool === "connect" ? "crosshair" : "default" }}
+      style={{
+        cursor:
+          isDragging && dragRef.current?.type === "pan"
+            ? "grabbing"
+            : tool === "pan"
+              ? "grab"
+              : tool === "connect"
+                ? "crosshair"
+                : isDragging
+                  ? "grabbing"
+                  : "default",
+      }}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -284,6 +286,34 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Empty state hint */}
+      {nodes.length === 0 && !isDragging && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center opacity-50">
+            <p className="text-sm text-muted-foreground">Clique duplo para adicionar um nó</p>
+            <p className="text-xs text-muted-foreground mt-1">ou use o botão "Adicionar" na barra</p>
+          </div>
+        </div>
+      )}
+
+      {/* Connection mode indicator */}
+      {tool === "connect" && !connectingFrom && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
+            Clique em um nó para iniciar a conexão
+          </div>
+        </div>
+      )}
+      {connectingFrom && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
+            Clique em outro nó para completar a conexão · Esc para cancelar
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+import { useState } from "react";

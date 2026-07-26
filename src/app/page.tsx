@@ -10,7 +10,10 @@ import { SettingsPanel } from "@/components/mindmap/SettingsPanel";
 import { Minimap } from "@/components/mindmap/Minimap";
 import { StatusBar } from "@/components/mindmap/StatusBar";
 import { ThemeManager } from "@/components/mindmap/ThemeManager";
+import { ShortcutsPanel } from "@/components/mindmap/ShortcutsPanel";
+import { ExportPanel } from "@/components/mindmap/ExportPanel";
 import { useAutosave } from "@/hooks/use-autosave";
+import { ToolProvider } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { BrainCircuit, Loader2 } from "lucide-react";
@@ -20,6 +23,8 @@ export default function Home() {
   const [nodeEditorOpen, setNodeEditorOpen] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
 
   const mapId = useMindMapStore((s) => s.mapId);
@@ -33,19 +38,16 @@ export default function Home() {
   useEffect(() => {
     async function init() {
       try {
-        // Check if any maps exist
         const listRes = await fetch("/api/maps");
         const listData = await listRes.json();
         const existingMaps = listData.maps ?? [];
 
         if (existingMaps.length > 0) {
-          // Load the most recent map
           const firstId = existingMaps[0].id;
           const mapRes = await fetch(`/api/maps/${firstId}`);
           const mapData = await mapRes.json();
           loadMap(mapData.map);
         } else {
-          // Create a new map
           const createRes = await fetch("/api/maps", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -64,75 +66,98 @@ export default function Home() {
     init();
   }, [loadMap]);
 
-  // Node editor opens when a node is selected via click in the canvas
-  // No effect needed — selection triggers onOpenNodeEditor from MindMapCanvas
-
   // Autosave hook
   useAutosave();
+
+  // No effect for nodeEditorOpen — the Toolbar and Canvas callbacks handle opening
 
   const handleOpenNodeEditor = useCallback(() => setNodeEditorOpen(true), []);
   const handleOpenAIPanel = useCallback(() => setAiPanelOpen(true), []);
   const handleOpenSidebar = useCallback(() => setSidebarOpen(true), []);
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+  const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
+  const handleOpenExport = useCallback(() => setExportOpen(true), []);
 
   if (loadingMap) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <BrainCircuit className="h-12 w-12 text-primary animate-pulse" />
-        <p className="text-sm text-muted-foreground">Carregando mapa mental...</p>
-        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <BrainCircuit className="h-14 w-14 text-primary animate-pulse" />
+          <p className="text-lg font-semibold brand-gradient">Mapa Mental Complexo com IA</p>
+          <p className="text-sm text-muted-foreground">Carregando mapa mental...</p>
+          <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Theme manager — no visual output */}
-      <ThemeManager />
+    <ToolProvider>
+      <div className="min-h-screen flex flex-col bg-background">
+        {/* Theme manager */}
+        <ThemeManager />
 
-      {/* Toolbar */}
-      <Toolbar
-        onOpenSettings={handleOpenSettings}
-        onOpenAIPanel={handleOpenAIPanel}
-        onOpenSidebar={handleOpenSidebar}
-      />
-
-      {/* Main content area */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Canvas */}
-        <MindMapCanvas
-          onOpenNodeEditor={handleOpenNodeEditor}
+        {/* Toolbar */}
+        <Toolbar
+          onOpenSettings={handleOpenSettings}
           onOpenAIPanel={handleOpenAIPanel}
+          onOpenSidebar={handleOpenSidebar}
+          onOpenShortcuts={handleOpenShortcuts}
+          onOpenExport={handleOpenExport}
         />
 
-        {/* Minimap overlay */}
-        {minimapEnabled && nodes.length > 0 && <Minimap />}
+        {/* Main content area */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Canvas */}
+          <MindMapCanvas
+            onOpenNodeEditor={handleOpenNodeEditor}
+            onOpenAIPanel={handleOpenAIPanel}
+          />
 
-        {/* Side panels */}
-        {nodeEditorOpen && (
-          <NodeEditor open={nodeEditorOpen} onClose={() => setNodeEditorOpen(false)} />
-        )}
-        {aiPanelOpen && (
-          <AIPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
-        )}
-        {settingsOpen && (
-          <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-        )}
-      </div>
+          {/* Minimap overlay */}
+          {minimapEnabled && nodes.length > 0 && <Minimap />}
 
-      {/* Status bar */}
-      <StatusBar />
-
-      {/* Sidebar (overlay) */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-border px-4 py-2 bg-card/80 backdrop-blur-sm">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="brand-gradient font-semibold">Mapa Mental Complexo com IA</span>
-          <span>Powered by Z.ai · Next.js 16 · TypeScript</span>
+          {/* Side panels */}
+          {nodeEditorOpen && selectedNodeIds.length > 0 && (
+            <NodeEditor open={nodeEditorOpen} onClose={() => setNodeEditorOpen(false)} />
+          )}
+          {aiPanelOpen && (
+            <AIPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+          )}
+          {settingsOpen && (
+            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+          )}
+          {exportOpen && (
+            <ExportPanel open={exportOpen} onClose={() => setExportOpen(false)} />
+          )}
         </div>
-      </footer>
-    </div>
+
+        {/* Status bar */}
+        <StatusBar />
+
+        {/* Sidebar (overlay) */}
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        {/* Shortcuts overlay */}
+        <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+        {/* Footer */}
+        <footer className="mt-auto border-t border-border px-4 py-2 bg-card/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="brand-gradient font-semibold">Mapa Mental Complexo com IA</span>
+            <div className="flex items-center gap-3">
+              <button
+                className="hover:text-primary transition-colors cursor-pointer"
+                onClick={handleOpenExport}
+                title="Exportar"
+              >
+                Exportar
+              </button>
+              <span>Powered by Z.ai</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </ToolProvider>
   );
 }
