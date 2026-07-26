@@ -16,11 +16,13 @@ import { ExportPanel } from "@/components/mindmap/ExportPanel";
 import { CommandPalette } from "@/components/mindmap/CommandPalette";
 import { FloatingToolbar } from "@/components/mindmap/FloatingToolbar";
 import { OnboardingTour, replayTour } from "@/components/mindmap/OnboardingTour";
+import { SearchPanel } from "@/components/mindmap/SearchPanel";
+import { TemplatesPanel } from "@/components/mindmap/TemplatesPanel";
 import { useAutosave } from "@/hooks/use-autosave";
 import { ToolProvider, useTool } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
-import { BrainCircuit, Loader2 } from "lucide-react";
+import { BrainCircuit, Loader2, Search, LayoutTemplate } from "lucide-react";
 
 /** Wrapper component inside ToolProvider that can use useTool */
 function FloatingToolbarWithCallbacks({ onOpenNodeEditor, onExpand }: { onOpenNodeEditor: () => void; onExpand: () => void }) {
@@ -46,8 +48,16 @@ export default function Home() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchKey, setSearchKey] = useState(0);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
   const [tourForceShow, setTourForceShow] = useState(false);
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    setSearchKey((k) => k + 1);
+  }, []);
 
   const mapId = useMindMapStore((s) => s.mapId);
   const loadMap = useMindMapStore((s) => s.loadMap);
@@ -109,6 +119,18 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Global Ctrl+F / Cmd+F to open the search panel (Task 15-B)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [openSearch]);
+
   // Autosave hook
   useAutosave();
 
@@ -117,12 +139,14 @@ export default function Home() {
     setAiPanelOpen(false);
     setSettingsOpen(false);
     setExportOpen(false);
+    setTemplatesOpen(false);
   }, []);
   const handleOpenAIPanel = useCallback(() => {
     setAiPanelOpen(true);
     setNodeEditorOpen(false);
     setSettingsOpen(false);
     setExportOpen(false);
+    setTemplatesOpen(false);
   }, []);
   const handleOpenSidebar = useCallback(() => setSidebarOpen(true), []);
   const handleOpenSettings = useCallback(() => {
@@ -130,6 +154,7 @@ export default function Home() {
     setNodeEditorOpen(false);
     setAiPanelOpen(false);
     setExportOpen(false);
+    setTemplatesOpen(false);
   }, []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
   const handleOpenExport = useCallback(() => {
@@ -137,6 +162,15 @@ export default function Home() {
     setNodeEditorOpen(false);
     setAiPanelOpen(false);
     setSettingsOpen(false);
+    setTemplatesOpen(false);
+  }, []);
+  // Templates panel — mutual exclusivity with other right-side panels (Task 15-C)
+  const handleOpenTemplates = useCallback(() => {
+    setTemplatesOpen(true);
+    setNodeEditorOpen(false);
+    setAiPanelOpen(false);
+    setSettingsOpen(false);
+    setExportOpen(false);
   }, []);
   const handleReplayTour = useCallback(() => {
     replayTour();
@@ -205,6 +239,9 @@ export default function Home() {
           {exportOpen && (
             <ExportPanel open={exportOpen} onClose={() => setExportOpen(false)} />
           )}
+          {templatesOpen && (
+            <TemplatesPanel open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
+          )}
         </div>
 
         {/* Status bar */}
@@ -223,6 +260,9 @@ export default function Home() {
           onOpenAIPanel={handleOpenAIPanel}
           onOpenNodeEditor={handleOpenNodeEditor}
         />
+
+        {/* Search panel (Ctrl+F) — Task 15-B */}
+        <SearchPanel key={searchKey} open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         {/* Onboarding tour */}
         <OnboardingTour forceShow={tourForceShow} />
@@ -247,6 +287,16 @@ export default function Home() {
               <span className="hidden md:inline shrink-0 text-muted-foreground/40">·</span>
               <button
                 className="hidden md:flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer shrink-0 px-2 py-1 rounded-md hover:bg-accent/40"
+                onClick={openSearch}
+                title="Buscar nós por conteúdo (Ctrl+F)"
+              >
+                <Search className="h-3.5 w-3.5 text-primary/80" />
+                <kbd className="text-[10px] bg-muted/80 px-1.5 py-0.5 rounded border border-border/60 font-mono">Ctrl+F</kbd>
+                <span className="font-medium">Buscar nós</span>
+              </button>
+              <span className="hidden md:inline shrink-0 text-muted-foreground/40">·</span>
+              <button
+                className="hidden md:flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer shrink-0 px-2 py-1 rounded-md hover:bg-accent/40"
                 onClick={handleOpenShortcuts}
                 title="Atalhos de teclado"
               >
@@ -255,6 +305,15 @@ export default function Home() {
               </button>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                className="hidden md:flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-accent/40 font-medium"
+                onClick={handleOpenTemplates}
+                title="Biblioteca de templates"
+              >
+                <LayoutTemplate className="h-3.5 w-3.5 text-primary/80" />
+                <span>Templates</span>
+              </button>
+              <span className="hidden sm:inline text-muted-foreground/40">·</span>
               <button
                 className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-accent/40 font-medium"
                 onClick={handleOpenExport}

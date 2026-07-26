@@ -148,7 +148,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const zoomPercent = Math.round(viewport.zoom * 100);
 
   return (
-    <div className="relative z-40 flex items-center gap-2 px-2 py-1.5 border-b border-border overflow-x-auto toolbar-container">
+    <div className="relative z-40 flex items-center gap-3 px-2 py-1.5 border-b border-border overflow-x-auto toolbar-container">
       {/* Bottom shadow gradient for depth */}
       <div className="toolbar-shadow" />
 
@@ -166,16 +166,16 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         {toolButtons.map((tb) => (
           <Button
             key={tb.toolId}
-            variant={isToolActive(tb.toolId) ? "default" : "ghost"}
+            variant="ghost"
             size="icon"
-            className={`h-8 w-8 transition-all relative toolbar-btn ${isToolActive(tb.toolId) ? "active-tool-ring" : ""}`}
+            className={`h-8 w-8 transition-all relative toolbar-btn ${isToolActive(tb.toolId) ? "toolbar-btn--active" : ""}`}
             onClick={() => setTool(tb.toolId as "select" | "pan" | "connect")}
             data-tooltip={`${tb.label} (${tb.shortcut})`}
           >
             {tb.icon}
             {/* Pulsing dot indicator when active */}
             {isToolActive(tb.toolId) && (
-              <span className="toolbar-active-dot" />
+              <span className="active-tool-dot" />
             )}
           </Button>
         ))}

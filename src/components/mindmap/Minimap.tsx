@@ -28,7 +28,7 @@ export function Minimap() {
   const scale = useMemo(() => {
     const w = bounds.maxX - bounds.minX;
     const h = bounds.maxY - bounds.minY;
-    const mapW = 180;
+    const mapW = 190;
     const mapH = 100;
     return Math.min(mapW / w, mapH / h);
   }, [bounds]);
@@ -57,14 +57,15 @@ export function Minimap() {
 
   return (
     <div
-      className="absolute bottom-3 right-3 w-[180px] rounded-xl overflow-hidden cursor-pointer fade-in group"
+      className="absolute bottom-3 right-3 w-[190px] rounded-xl overflow-hidden cursor-pointer fade-in group"
       onClick={handleMinimapClick}
       style={{
         background: "color-mix(in srgb, var(--card) 78%, transparent)",
         backdropFilter: "blur(20px) saturate(1.4)",
         WebkitBackdropFilter: "blur(20px) saturate(1.4)",
         border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)",
-        boxShadow: "0 8px 28px -8px rgba(0,0,0,0.35), 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent), inset 0 1px 0 color-mix(in srgb, white 8%, transparent)",
+        boxShadow:
+          "0 12px 32px -8px rgba(0,0,0,0.4), 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent), inset 0 1px 0 color-mix(in srgb, white 8%, transparent)",
       }}
     >
       <div
@@ -81,15 +82,22 @@ export function Minimap() {
         <span className="text-[9px] text-foreground/70 tabular-nums font-mono px-1.5 py-0.5 rounded bg-background/60 border border-border/40">{Math.round(viewport.zoom * 100)}%</span>
       </div>
       <div className="relative">
-        <svg width="180" height="100" style={{ pointerEvents: "none", display: "block" }}>
-          {/* Subtle inner background gradient */}
+        <svg width="190" height="100" style={{ pointerEvents: "none", display: "block" }}>
+          {/* Subtle inner background gradient + viewport glow filter definition */}
           <defs>
             <radialGradient id="minimap-bg" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.04" />
               <stop offset="100%" stopColor="transparent" />
             </radialGradient>
+            <filter id="minimap-viewport-glow" x="-25%" y="-25%" width="150%" height="150%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
-          <rect width="180" height="100" fill="url(#minimap-bg)" />
+          <rect width="190" height="100" fill="url(#minimap-bg)" />
           {/* edges as thin lines */}
           {edges.map((e) => {
             const s = nodes.find((n) => n.id === e.sourceId);
@@ -112,7 +120,7 @@ export function Minimap() {
               />
             );
           })}
-          {/* nodes as small rectangles */}
+          {/* nodes as small rectangles — larger ones show the first letter of the title */}
           {nodes.map((n) => {
             const nx = (n.x - bounds.minX) * scale;
             const ny = (n.y - bounds.minY) * scale;
@@ -121,29 +129,69 @@ export function Minimap() {
             const kindMeta = NODE_KIND_META[n.kind as keyof typeof NODE_KIND_META];
             const color = n.color || (autoColorsEnabled ? kindMeta?.color : "var(--primary)");
             const isSelected = false; // could track selection if needed
+            // Show the first letter of the title for nodes that are large enough in minimap space
+            const showInitial = nw >= 16 && nh >= 12 && n.title && n.title.length > 0;
+            const initial = showInitial ? n.title.charAt(0).toUpperCase() : "";
+            // Font size scales with rectangle size, capped for readability
+            const fontSize = Math.min(Math.max(Math.min(nw, nh) * 0.5, 6), 11);
             return (
-              <rect
-                key={n.id}
-                x={nx}
-                y={ny}
-                width={nw}
-                height={nh}
-                rx={1.5}
-                fill={color}
-                opacity={isSelected ? 0.95 : 0.6}
-                stroke={color}
-                strokeWidth={0.4}
-              />
+              <g key={n.id}>
+                <rect
+                  x={nx}
+                  y={ny}
+                  width={nw}
+                  height={nh}
+                  rx={1.5}
+                  fill={color}
+                  opacity={isSelected ? 0.95 : 0.7}
+                  stroke={color}
+                  strokeWidth={0.6}
+                />
+                {/* Subtle inner border for definition */}
+                <rect
+                  x={nx + 0.5}
+                  y={ny + 0.5}
+                  width={Math.max(nw - 1, 0.5)}
+                  height={Math.max(nh - 1, 0.5)}
+                  rx={1}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.45)"
+                  strokeWidth={0.4}
+                  style={{ pointerEvents: "none" }}
+                />
+                {showInitial && (
+                  <text
+                    x={nx + nw / 2}
+                    y={ny + nh / 2 + fontSize / 3}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fontWeight={700}
+                    fill="white"
+                    style={{ pointerEvents: "none", userSelect: "none" }}
+                  >
+                    {initial}
+                  </text>
+                )}
+              </g>
             );
           })}
-          {/* viewport indicator */}
+          {/* viewport indicator — thicker stroke, soft glow, L-shaped corner accents */}
           {(() => {
             const vx = (-viewport.x / viewport.zoom - bounds.minX) * scale;
             const vy = (-viewport.y / viewport.zoom - bounds.minY) * scale;
             const vw = (typeof window !== "undefined" ? window.innerWidth : 600) / viewport.zoom * scale;
             const vh = (typeof window !== "undefined" ? window.innerHeight - 100 : 500) / viewport.zoom * scale;
+            // L-shaped corner marks — arm length scales with viewport size (clamped)
+            const armLen = Math.min(Math.max(Math.min(vw, vh) * 0.18, 4), 10);
+            const corners: Array<{ cx: number; cy: number; dx: 1 | -1; dy: 1 | -1 }> = [
+              { cx: vx, cy: vy, dx: 1, dy: 1 },
+              { cx: vx + vw, cy: vy, dx: -1, dy: 1 },
+              { cx: vx, cy: vy + vh, dx: 1, dy: -1 },
+              { cx: vx + vw, cy: vy + vh, dx: -1, dy: -1 },
+            ];
             return (
-              <>
+              <g filter="url(#minimap-viewport-glow)">
+                {/* Soft glow halo behind the viewport rect */}
                 <rect
                   x={vx}
                   y={vy}
@@ -155,13 +203,16 @@ export function Minimap() {
                   strokeWidth={1.5}
                   opacity={0.95}
                 />
-                {/* Corner accents for the viewport rect */}
-                {[
-                  [vx, vy], [vx + vw, vy], [vx, vy + vh], [vx + vw, vy + vh],
-                ].map(([cx, cy], i) => (
-                  <circle key={i} cx={cx} cy={cy} r={2} fill="var(--primary)" />
+                {/* L-shaped corner accents at each viewport corner */}
+                {corners.map((c, i) => (
+                  <g key={i} stroke="var(--primary)" strokeWidth={1.8} strokeLinecap="round" fill="none">
+                    {/* horizontal arm */}
+                    <line x1={c.cx} y1={c.cy} x2={c.cx + c.dx * armLen} y2={c.cy} />
+                    {/* vertical arm */}
+                    <line x1={c.cx} y1={c.cy} x2={c.cx} y2={c.cy + c.dy * armLen} />
+                  </g>
                 ))}
-              </>
+              </g>
             );
           })()}
         </svg>

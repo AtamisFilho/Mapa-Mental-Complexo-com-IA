@@ -30,7 +30,7 @@ export function StatusBar() {
   }
 
   return (
-    <div className="grid grid-cols-3 items-center px-4 py-1.5 border-t backdrop-blur-md text-xs gap-3 min-h-[34px] relative"
+    <div className="grid grid-cols-3 items-center px-4 py-2.5 border-t backdrop-blur-md text-xs gap-3 min-h-[40px] relative"
       style={{
         background: "linear-gradient(180deg, color-mix(in srgb, var(--card) 95%, transparent) 0%, var(--card) 100%)",
         borderColor: "color-mix(in srgb, var(--border) 75%, transparent)",
@@ -38,26 +38,26 @@ export function StatusBar() {
       }}
     >
       {/* Top accent gradient line */}
-      <div
-        className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-        style={{
-          background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--primary) 35%, transparent) 30%, color-mix(in srgb, var(--primary) 35%, transparent) 70%, transparent 100%)",
-        }}
-      />
+      <div className="status-bar-accent-line" />
       {/* Left section: Count badges with subtle gradient separator */}
       <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-        <span className="pill-badge shrink-0" style={{ borderLeftWidth: 3, borderLeftColor: "var(--primary)" }}>
-          <span className="font-bold text-foreground">{nodes.length}</span>
-          nós
+        <span
+          className="pill-badge shrink-0 flex items-center justify-center"
+          style={{ borderLeftWidth: 3, borderLeftColor: "var(--primary)" }}
+        >
+          <span className="font-bold text-foreground leading-none">{nodes.length}</span>
+          <span className="leading-none">nós</span>
         </span>
-        <span className="pill-badge shrink-0">
-          <span className="font-bold text-foreground">{edges.length}</span>
-          conexões
+        <span
+          className="pill-badge shrink-0 flex items-center justify-center"
+        >
+          <span className="font-bold text-foreground leading-none">{edges.length}</span>
+          <span className="leading-none">conexões</span>
         </span>
         {selectedNodeIds.length > 0 && (
-          <span className="pill-badge pill-badge--accent shrink-0">
+          <span className="pill-badge pill-badge--accent shrink-0 flex items-center justify-center">
             <Circle className="h-2.5 w-2.5 fill-primary text-primary" />
-            {selectedNodeIds.length} selecionado{selectedNodeIds.length > 1 ? "s" : ""}
+            <span className="leading-none">{selectedNodeIds.length} selecionado{selectedNodeIds.length > 1 ? "s" : ""}</span>
           </span>
         )}
         {nodes.length > 0 && (
@@ -68,11 +68,16 @@ export function StatusBar() {
               return (
                 <span
                   key={kind}
-                  className="pill-badge shrink-0"
-                  style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                  className="pill-badge shrink-0 flex items-center justify-center"
                 >
-                  <span className="font-bold" style={{ color }}>{count}</span>
-                  <span className="text-muted-foreground">{meta?.label ?? kind}</span>
+                  {/* Small colored dot for visual distinction of each kind */}
+                  <span
+                    aria-hidden
+                    className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ background: color, boxShadow: `0 0 4px 1px ${color}55` }}
+                  />
+                  <span className="font-bold leading-none" style={{ color }}>{count}</span>
+                  <span className="text-muted-foreground leading-none">{meta?.label ?? kind}</span>
                 </span>
               );
             })}
@@ -95,24 +100,24 @@ export function StatusBar() {
       {/* Right section: Save status + Zoom with color indicators */}
       <div className="flex items-center justify-end gap-2 shrink-0">
         {saving ? (
-          <span className="pill-badge pill-badge--accent shrink-0">
+          <span className="pill-badge pill-badge--accent shrink-0 flex items-center justify-center">
             <Loader2 className="h-3 w-3 animate-spin text-primary" />
-            Salvando...
+            <span className="leading-none">Salvando...</span>
           </span>
         ) : dirty ? (
-          <span className="pill-badge shrink-0" style={{ borderLeftColor: "#f59e0b", borderLeftWidth: 3 }}>
+          <span className="pill-badge shrink-0 flex items-center justify-center" style={{ borderLeftColor: "#f59e0b", borderLeftWidth: 3 }}>
             <AlertCircle className="h-3 w-3 text-amber-500" />
-            Modificado
+            <span className="leading-none">Modificado</span>
           </span>
         ) : (
-          <span className="pill-badge shrink-0" style={{ borderLeftColor: "var(--primary)", borderLeftWidth: 3 }}>
+          <span className="pill-badge shrink-0 flex items-center justify-center" style={{ borderLeftColor: "var(--primary)", borderLeftWidth: 3 }}>
             <Check className="h-3 w-3 text-primary" />
-            {savedLabel}
+            <span className="leading-none">{savedLabel}</span>
           </span>
         )}
-        <span className="pill-badge shrink-0 font-mono tabular-nums" style={{ borderLeftWidth: 3, borderLeftColor: "var(--primary)" }}>
-          <span className="font-bold text-foreground">{Math.round(viewport.zoom * 100)}</span>
-          %
+        <span className="pill-badge shrink-0 font-mono tabular-nums flex items-center justify-center" style={{ borderLeftWidth: 3, borderLeftColor: "var(--primary)" }}>
+          <span className="font-bold text-foreground leading-none">{Math.round(viewport.zoom * 100)}</span>
+          <span className="leading-none">%</span>
         </span>
       </div>
     </div>

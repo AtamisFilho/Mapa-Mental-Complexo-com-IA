@@ -74,6 +74,10 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
     );
   })();
 
+  // Search match highlighting (Task 15-B) — subscribe to search state.
+  const isSearchMatch = useMindMapStore((s) => s.searchMatches.includes(node.id));
+  const isSearchHighlight = useMindMapStore((s) => s.highlightedMatchId === node.id);
+
   const animations = useSettingsStore((s) => s.settings.visual.animations);
   const autoColors = useSettingsStore((s) => s.settings.visual.autoColors);
   const glow = useSettingsStore((s) => s.settings.visual.glow);
@@ -157,7 +161,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
       }`}
     >
       <div
-        className={`relative flex flex-col gap-1.5 p-3 ${
+        className={`glass-node relative flex flex-col gap-1.5 p-3 ${
           selected && glow ? "node-glow" : ""
         } ${
           isChainConnected ? "chain-highlight" : ""
@@ -175,13 +179,47 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           }`,
           borderRadius: radius,
           boxShadow: selected
-            ? `0 8px 28px rgba(0,0,0,0.16)`
+            ? `0 0 0 1px ${accentColor}30, 0 12px 36px rgba(0,0,0,0.22)`
             : hovered
-              ? `0 6px 18px rgba(0,0,0,0.10)`
+              ? `0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px ${accentColor}20`
               : "var(--node-shadow)",
           transition: "border-color 0.15s ease, box-shadow 0.15s ease, background 0.2s ease",
         }}
       >
+        {/* Search match ring overlay (Task 15-B) — amber halo for matches, pulsing ring for the highlighted (active) match */}
+        {isSearchMatch && (
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={
+              isSearchHighlight
+                ? {
+                    opacity: [0.65, 1, 0.65],
+                    boxShadow: [
+                      "0 0 0 2px rgba(245,158,11,0.55), 0 0 10px 2px rgba(245,158,11,0.35)",
+                      "0 0 0 3px rgba(245,158,11,1), 0 0 20px 6px rgba(245,158,11,0.7)",
+                      "0 0 0 2px rgba(245,158,11,0.55), 0 0 10px 2px rgba(245,158,11,0.35)",
+                    ],
+                  }
+                : { opacity: 1 }
+            }
+            transition={
+              isSearchHighlight
+                ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 0.15 }
+            }
+            style={{
+              position: "absolute",
+              inset: -3,
+              borderRadius: `calc(${radius} + 3px)`,
+              pointerEvents: "none",
+              boxShadow: isSearchHighlight
+                ? undefined
+                : "0 0 0 2px rgba(245,158,11,0.45), 0 0 8px 1px rgba(245,158,11,0.18)",
+            }}
+          />
+        )}
+
         {/* #5: Accent stripe — 6px wide with gradient from solid top to fading bottom */}
         <div
           aria-hidden
@@ -243,9 +281,9 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
                 <Icon className="h-3.5 w-3.5" />
               )}
             </div>
-            {/* #2: Kind badge — tiny text badge below the icon */}
+            {/* #2: Kind badge — tiny uppercase tracked text badge below the icon */}
             <span
-              className="text-[8px] leading-none font-semibold tracking-wide"
+              className="text-[8px] leading-none font-semibold uppercase tracking-wider"
               style={{
                 color: accentColor,
                 background: `${accentColor}12`,
@@ -258,7 +296,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           </div>
           <div className="min-w-0 flex-1">
             <p
-              className="text-[13px] font-bold leading-snug break-words tracking-tight"
+              className="text-[14px] font-bold leading-snug break-words tracking-tight"
               style={{ color: "var(--foreground)" }}
             >
               {node.title}
@@ -286,7 +324,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           )}
         </div>
         {!node.collapsed && node.content && (
-          <p className="pl-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-3 break-words">
+          <p className="pl-1.5 text-xs leading-relaxed text-muted-foreground/90 line-clamp-3 break-words">
             {node.content}
           </p>
         )}

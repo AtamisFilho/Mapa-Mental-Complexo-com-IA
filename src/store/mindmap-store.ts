@@ -9,6 +9,7 @@ import type {
   EdgeKind,
   MindMapData,
 } from "@/lib/types";
+import type { SubtreeTemplateNode } from "@/lib/subtree-templates";
 
 interface HistoryEntry {
   nodes: MapNode[];
@@ -35,6 +36,11 @@ interface MindMapState {
   // history
   past: HistoryEntry[];
   future: HistoryEntry[];
+
+  // search (Task 15-B)
+  searchQuery: string;
+  searchMatches: string[]; // nodeIds that match the current query
+  highlightedMatchId: string | null;
 
   // actions: data
   loadMap: (map: MindMapData) => void;
@@ -67,10 +73,37 @@ interface MindMapState {
   toggleCollapse: (id: string) => void;
   organizeLayout: () => void;
 
+  // subtree templates (Task 15-C)
+  insertSubtree: (
+    template: SubtreeTemplateNode,
+    position: { x: number; y: number },
+    parentId?: string | null
+  ) => string;
+
   // history
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
+
+  // search actions (Task 15-B)
+  setSearchQuery: (q: string) => void;
+  setSearchMatches: (ids: string[]) => void;
+  setHighlightedMatch: (id: string | null) => void;
+  searchNodes: (
+    query: string,
+    opts?: { caseSensitive?: boolean; titleOnly?: boolean }
+  ) => string[];
+  replaceInNode: (
+    nodeId: string,
+    search: string,
+    replacement: string,
+    opts?: { caseSensitive?: boolean }
+  ) => number;
+  replaceAll: (
+    search: string,
+    replacement: string,
+    opts?: { caseSensitive?: boolean }
+  ) => number;
 }
 
 let idCounter = 0;
@@ -97,6 +130,11 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   past: [],
   future: [],
 
+  // search (Task 15-B)
+  searchQuery: "",
+  searchMatches: [],
+  highlightedMatchId: null,
+
   loadMap: (map) =>
     set({
       mapId: map.id,
@@ -112,6 +150,10 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       selectedNodeIds: [],
       selectedEdgeIds: [],
       viewport: { x: 0, y: 0, zoom: 1 },
+      // reset search state on map switch (Task 15-B)
+      searchQuery: "",
+      searchMatches: [],
+      highlightedMatchId: null,
     }),
 
   setMeta: (title, description) =>
@@ -430,6 +472,99 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     set({ nodes: updated, dirty: true });
   },
 
+  insertSubtree: (template, position, parentId) => {
+    // Push current state to history so the insertion is undoable as a single step
+    get().pushHistory();
+
+    // Tree layout: root at `position`. Children are indented horizontally by
+    // 200px and stacked vertically with 60px spacing. Each child's subtree is
+    // placed below the previous sibling's subtree (so siblings don't overlap).
+    const NODE_HEIGHT = 80;
+    const NODE_WIDTH = 200;
+    const VERTICAL_GAP = 60;
+    const HORIZONTAL_INDENT = 200;
+
+    const addNode = get().addNode;
+    const addEdge = get().addEdge;
+
+    // Recursive helper — returns the y-coordinate of the BOTTOM of the inserted
+    // subtree (so the next sibling can be placed below without overlap).
+    const buildSubtree = (
+      node: SubtreeTemplateNode,
+      x: number,
+      y: number,
+      parent: string | null
+    ): number => {
+      const id = addNode({
+        title: node.title,
+        kind: node.kind,
+        content: node.content,
+        note: node.note,
+        icon: node.icon,
+        x,
+        y,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        parentId: parent,
+      });
+      if (parent) {
+        addEdge(parent, id);
+      }
+
+      let bottomY = y + NODE_HEIGHT;
+      const kids = node.children;
+      if (kids && kids.length > 0) {
+        let childY = y + NODE_HEIGHT + VERTICAL_GAP;
+        for (const child of kids) {
+          const childBottom = buildSubtree(
+            child,
+            x + HORIZONTAL_INDENT,
+            childY,
+            id
+          );
+          childY = childBottom + VERTICAL_GAP;
+          if (childBottom > bottomY) bottomY = childBottom;
+        }
+      }
+      return bottomY;
+    };
+
+    const rootId = addNode({
+      title: template.title,
+      kind: template.kind,
+      content: template.content,
+      note: template.note,
+      icon: template.icon,
+      x: position.x,
+      y: position.y,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+      parentId: parentId ?? null,
+    });
+    if (parentId) {
+      addEdge(parentId, rootId);
+    }
+
+    // Lay out the root's children beneath it
+    const kids = template.children;
+    if (kids && kids.length > 0) {
+      let childY = position.y + NODE_HEIGHT + VERTICAL_GAP;
+      for (const child of kids) {
+        const childBottom = buildSubtree(
+          child,
+          position.x + HORIZONTAL_INDENT,
+          childY,
+          rootId
+        );
+        childY = childBottom + VERTICAL_GAP;
+      }
+    }
+
+    // Select the new root so the user can immediately interact with it
+    set({ selectedNodeIds: [rootId], selectedEdgeIds: [], dirty: true });
+    return rootId;
+  },
+
   pushHistory: () =>
     set((s) => {
       const entry: HistoryEntry = { nodes: s.nodes, edges: s.edges };
@@ -464,6 +599,117 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
         dirty: true,
       };
     }),
+
+  // ── Search & Replace (Task 15-B) ─────────────────────────────────────
+  setSearchQuery: (q) => set({ searchQuery: q }),
+  setSearchMatches: (ids) => set({ searchMatches: ids }),
+  setHighlightedMatch: (id) => set({ highlightedMatchId: id }),
+
+  searchNodes: (query, opts) => {
+    const caseSensitive = opts?.caseSensitive ?? false;
+    const titleOnly = opts?.titleOnly ?? false;
+    const q = caseSensitive ? query : query.toLowerCase();
+    if (!query.trim()) {
+      set({ searchQuery: query, searchMatches: [], highlightedMatchId: null });
+      return [];
+    }
+    const nodes = get().nodes;
+    const matched = nodes
+      .filter((n) => {
+        const title = caseSensitive ? n.title : n.title.toLowerCase();
+        if (title.includes(q)) return true;
+        if (titleOnly) return false;
+        const content = caseSensitive ? (n.content ?? "") : (n.content ?? "").toLowerCase();
+        const note = caseSensitive ? (n.note ?? "") : (n.note ?? "").toLowerCase();
+        return content.includes(q) || note.includes(q);
+      })
+      .map((n) => n.id);
+    set({
+      searchQuery: query,
+      searchMatches: matched,
+      highlightedMatchId: matched.length > 0 ? matched[0] : null,
+    });
+    return matched;
+  },
+
+  replaceInNode: (nodeId, search, replacement, opts) => {
+    const caseSensitive = opts?.caseSensitive ?? false;
+    if (!search) return 0;
+    const node = get().nodes.find((n) => n.id === nodeId);
+    if (!node) return 0;
+    // Build a case-sensitive or case-insensitive regex; escape regex special chars.
+    const flags = caseSensitive ? "g" : "gi";
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(escaped, flags);
+    let count = 0;
+    const patch: Partial<MapNode> = {};
+    if (node.title) {
+      const matches = node.title.match(re);
+      if (matches && matches.length > 0) {
+        patch.title = node.title.replace(re, replacement);
+        count += matches.length;
+      }
+    }
+    if (node.content) {
+      const matches = node.content.match(re);
+      if (matches && matches.length > 0) {
+        patch.content = node.content.replace(re, replacement);
+        count += matches.length;
+      }
+    }
+    if (count > 0) {
+      get().pushHistory();
+      get().updateNode(nodeId, patch);
+    }
+    return count;
+  },
+
+  replaceAll: (search, replacement, opts) => {
+    const caseSensitive = opts?.caseSensitive ?? false;
+    if (!search) return 0;
+    const matchedIds = get().searchMatches;
+    if (matchedIds.length === 0) return 0;
+    const flags = caseSensitive ? "g" : "gi";
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(escaped, flags);
+    let total = 0;
+    const nodes = get().nodes;
+    const updates = new Map<string, Partial<MapNode>>();
+    for (const id of matchedIds) {
+      const n = nodes.find((x) => x.id === id);
+      if (!n) continue;
+      const patch: Partial<MapNode> = {};
+      if (n.title) {
+        const m = n.title.match(re);
+        if (m && m.length > 0) {
+          patch.title = n.title.replace(re, replacement);
+          total += m.length;
+        }
+      }
+      if (n.content) {
+        const m = n.content.match(re);
+        if (m && m.length > 0) {
+          patch.content = n.content.replace(re, replacement);
+          total += m.length;
+        }
+      }
+      if (Object.keys(patch).length > 0) {
+        updates.set(id, patch);
+      }
+    }
+    if (updates.size > 0) {
+      get().pushHistory();
+      set((s) => ({
+        nodes: s.nodes.map((n) =>
+          updates.has(n.id)
+            ? { ...n, ...updates.get(n.id)!, updatedAt: new Date().toISOString() }
+            : n
+        ),
+        dirty: true,
+      }));
+    }
+    return total;
+  },
 }));
 
 // helper exports

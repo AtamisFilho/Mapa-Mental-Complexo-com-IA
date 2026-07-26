@@ -308,7 +308,7 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             opacity={p.selected ? 1 : p.isNodeConnected ? 0.7 : 0.5}
             style={{ transition: "opacity 0.15s ease" }}
           />
-          {/* Edge label with improved background and sizing */}
+          {/* Edge label with pill background, hover scale + brighter, contrasting text outline */}
           {p.label && editingEdgeId !== p.id && (
             <g
               style={{ pointerEvents: "auto", cursor: "pointer" }}
@@ -319,25 +319,59 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
                 handleLabelDoubleClick(p.id, p.mx, p.my, p.hasCustomLabel ? p.label : null);
               }}
             >
-              {/* Measure text width more accurately: use per-character estimate with padding */}
               {(() => {
                 const labelLen = p.label.length;
                 // Better width estimate: average char width ~7px at 12px font, plus generous padding
                 const textW = labelLen * 7 + 20;
                 const textH = 22;
+                const isLabelHovered = hoveredLabelId === p.id;
+                // Semi-transparent edge-color-tinted background + subtle border for the pill
+                const pillFill = `${p.color}20`;
+                const pillStroke = `${p.color}80`;
+                // Outer contrasting outline (white with low opacity — reads on both light and dark)
+                const outlineStroke = "rgba(255,255,255,0.85)";
+                // Text drop-shadow for readability on busy backgrounds
+                const labelOpacity = isLabelHovered ? 1 : p.selected ? 0.98 : 0.92;
                 return (
-                  <>
+                  <g
+                    style={{
+                      transition: "transform 0.15s ease, filter 0.15s ease",
+                      transformOrigin: `${p.mx}px ${p.my}px`,
+                      transform: isLabelHovered ? "scale(1.1)" : "scale(1)",
+                      filter: isLabelHovered ? "brightness(1.18)" : "none",
+                    }}
+                  >
                     <rect
                       x={p.mx - textW / 2}
                       y={p.my - textH / 2}
                       width={textW}
                       height={textH}
                       rx={textH / 2}
-                      fill="var(--node-bg)"
-                      stroke={p.color}
+                      fill={pillFill}
+                      stroke={pillStroke}
                       strokeWidth={1.4}
-                      opacity={p.selected ? 0.98 : 0.92}
+                      opacity={labelOpacity}
                     />
+                    {/* Contrasting outline behind the text for readability on busy backgrounds */}
+                    <text
+                      x={p.mx}
+                      y={p.my + 4}
+                      textAnchor="middle"
+                      fontSize={12}
+                      fill="transparent"
+                      stroke={outlineStroke}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      fontWeight={700}
+                      style={{
+                        pointerEvents: "none",
+                        userSelect: "none",
+                        filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
+                      }}
+                    >
+                      {p.label}
+                    </text>
+                    {/* Main label text on top */}
                     <text
                       x={p.mx}
                       y={p.my + 4}
@@ -345,11 +379,15 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
                       fontSize={12}
                       fill={p.color}
                       fontWeight={600}
-                      style={{ pointerEvents: "none", userSelect: "none" }}
+                      style={{
+                        pointerEvents: "none",
+                        userSelect: "none",
+                        filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
+                      }}
                     >
                       {p.label}
                     </text>
-                  </>
+                  </g>
                 );
               })()}
               {/* Tooltip hint on hover */}

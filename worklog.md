@@ -974,3 +974,334 @@ Recommended next steps:
 6. **Performance investigation** — the OOM-killing could be mitigated by code-splitting heavy components (e.g., lazy-load AIPanel, IconPicker).
 7. **Add a "Share read-only" link** — generate a public URL that loads the map in read-only mode.
 8. **Onboarding tour improvements** — VLM noted the welcome modal appears slightly off-center; could fine-tune positioning.
+
+---
+Task ID: 15-C
+Agent: full-stack-developer
+Task: Add Templates Library panel with 12+ subtree templates users can insert into the current map
+
+Work Log:
+- Read worklog.md (last ~400 lines) to understand prior progress (Tasks 0–14: full app built, features include favorites, icon picker, alignment guides, command palette, search panel being added in parallel by Task 15-B).
+- Read the relevant source files: `src/lib/types.ts` (NodeKind union: concept | question | action | idea | resource | goal), `src/lib/templates.ts` (existing whole-map templates), `src/store/mindmap-store.ts` (Zustand store with `addNode` / `addEdge` / `pushHistory`), `src/components/mindmap/AIPanel.tsx` (right-side panel layout reference), `src/components/mindmap/ExportPanel.tsx` (panel/Card patterns), `src/components/mindmap/IconPicker.tsx` (framer-motion + AnimatePresence pattern), `src/app/globals.css` (`.glass-panel`, `.scroll-thin`, panel-slide-in keyframes).
+- Confirmed framer-motion is already a project dependency (no new deps needed).
+
+**1. Created `/home/z/my-project/src/lib/subtree-templates.ts`** (NEW FILE):
+- Exported `SubtreeTemplateNode` (title, content?, note?, kind: NodeKind, icon?, children?) and `SubtreeTemplate` (id, name, description, category, icon, root).
+- Imported `NodeKind` from `@/lib/types` as required.
+- Exported `SUBTREE_CATEGORY_META` mapping each category to a label + accent color (productivity=emerald, study=amber, business=teal, creative=violet, personal=pink).
+- Exported `countSubtreeNodes(node)` helper for the node-count badge.
+- Defined 13 templates across all 5 categories:
+  - **productivity**: "Reunião eficaz" (12 nodes: Pauta→Tópicos,Tempo por tópico; Participantes→Anfitrião,Convidados; Decisões; Itens de ação→Responsável,Prazo; Follow-up), "Revisão semanal" (9 nodes: Vitórias→Pessoal,Profissional; Desafios; Lições; Prioridades→Top 3,Tarefas secundárias), "Decisão 5W2H" (8 nodes: Quem/O quê/Quando/Onde/Por quê/Como/Quanto)
+  - **study**: "Resumo de livro" (8 nodes: Tese central; Argumentos-chave→Argumento 1,Argumento 2; Evidências; Contrapontos; Aplicação prática), "Método Feynman" (8 nodes: Tópico; Explicar simples→Analogia,Exemplo; Identificar lacunas; Refinar; Ensinar), "Aprendizado ativo" (8 nodes: Pré-visualização→Sumário,Objetivos; Perguntas; Leitura ativa; Recitar; Revisão)
+  - **business**: "Análise SWOT compacta" (7 nodes: Forças→Recurso-chave,Capacidade; Fraquezas; Oportunidades; Ameaças), "Canvas de proposta de valor" (8 nodes: Cliente→Jobs,Dores,Ganhos; Produtos e Serviços; Criadores de Ganho; Aliviadores de Dor), "5 Forças de Porter" (8 nodes: Rivais; Novos entrantes; Substitutos; Fornecedores→Poder,Concentração; Compradores)
+  - **creative**: "Brainstorm SCAMPER" (10 nodes: Substituir→Material,Processo; Combinar; Adaptar; Modificar; Usar de outro jeito; Eliminar; Inverter), "Storyboard de ideia" (9 nodes: Premissa→Tema,Tom; Personagens; Cenário; Conflito; Clímax; Resolução)
+  - **personal**: "Hábito atômico" (9 nodes: Gatilho→Tempo,Lugar,Estado emocional; Desejo; Resposta; Recompensa; Identidade), "Planejamento de viagem" (10 nodes: Destino→Cidade,Época do ano; Orçamento→Transporte,Hospedagem; Roteiro; Lista de bagagem; Documentos)
+- Every template has 3+ root-level children and at least one nested subtree (depth ≥ 2) to demonstrate the recursive layout.
+- Exported `SUBTREE_TEMPLATES` array containing all 13.
+
+**2. Modified `/home/z/my-project/src/store/mindmap-store.ts`**:
+- Added import: `import type { SubtreeTemplateNode } from "@/lib/subtree-templates";`
+- Added a new action signature to the `MindMapState` interface: `insertSubtree(template, position, parentId?) => string` placed between `organizeLayout` and `pushHistory` to avoid touching the search actions (Task 15-B) below.
+- Implemented `insertSubtree`:
+  - Calls `get().pushHistory()` first so the entire insertion is undoable as a single step.
+  - Defines module-level layout constants inside the action: `NODE_HEIGHT=80`, `NODE_WIDTH=200`, `VERTICAL_GAP=60`, `HORIZONTAL_INDENT=200`.
+  - Recursive `buildSubtree(node, x, y, parent)` helper: creates the node via `addNode`, links it to `parent` via `addEdge`, then lays out its children indented +200px to the right and stacked vertically below with 60px gap. Returns the y-coordinate of the bottom of the subtree so the next sibling can be placed below without overlap.
+  - Creates the root at the requested `position` (or links to `parentId` if provided), then lays out the root's children.
+  - After insertion, sets `selectedNodeIds: [rootId]` so the user can immediately interact with the inserted root.
+  - Returns the root node ID.
+- Did NOT modify or break any existing exports/actions (loadMap, addNode, addEdge, pushHistory, undo, redo, search actions all untouched).
+
+**3. Created `/home/z/my-project/src/components/mindmap/TemplatesPanel.tsx`** (NEW FILE):
+- Right-side panel built with `motion.div` (framer-motion) — entrance animation slides in from +320px with opacity fade, using the `[0.22, 1, 0.36, 1]` cubic-bezier to match other panels.
+- Styling: `w-[340px] glass-panel flex flex-col shadow-2xl z-30 mr-3 mt-2 mb-2 rounded-xl overflow-hidden` — floating card style that visually distinguishes it from the flush AIPanel/ExportPanel while still using the dark-mode `glass-panel` utility class.
+- Header: title "Biblioteca de Templates" with `LayoutTemplate` lucide icon in a primary-tinted box, plus a ghost close button (X).
+- Search input: `Input` with `Search` icon prefix, filters templates by name/description/root.title (case-insensitive).
+- Category filter pills: Todos, Produtividade, Estudos, Negócios, Criativo, Pessoal — each pill is highlighted with the category's accent color when active (using `color-mix(in srgb, ${accent} 85%, transparent)` for the active background).
+- Template grid: 1 column on mobile, 2 columns on `sm+` screens. Each card has:
+  - 8x8 colored circle with the template emoji (uses category accent color via color-mix).
+  - Template name (truncate), category label (in accent color, uppercase tiny).
+  - `Badge` (monospace) with node count.
+  - Description (truncated to 2 lines via `line-clamp-2`).
+  - Hover overlay: card lifts (-2px via `whileHover` motion), and a translucent overlay with an "Inserir" button (Plus icon + primary background) appears.
+- Empty state when no templates match the search.
+- Clicking a card opens a `Dialog` (shadcn/ui) with 3 insert-position options:
+  1. "No centro do canvas" — computes world coords from window center / viewport.x/y/zoom, with -100/-40 offset so the inserted root is centered.
+  2. "Próximo ao nó selecionado" — disabled if no node is selected (greyed out with explanatory text); otherwise uses `selectedNode.x + 200, selectedNode.y + 200`.
+  3. "Em posição livre" — defaults to world coords `{x: 200, y: 200}`.
+- Each option button shows a Lucide icon (Crosshair, MousePointerClick, MapPin) and a short description. Shows a `Loader2` spinner on the chosen option while inserting.
+- On confirm: calls `insertSubtree(template.root, pos, undefined)`, fires `toast({title: "Template inserido", description: "${name} — N nós adicionados.", variant: "success"})`, then `focusNode(rootId)` after a 50ms delay so the canvas centers on the new subtree.
+- Catches errors and shows an error toast.
+- Footer: shows "N templates" count + a "Fechar" outline button.
+- Also exported `TemplatesPanelAnimated` wrapper using `<AnimatePresence>` for callers that want exit animations.
+- Used only existing dependencies (shadcn/ui Dialog/Input/Button/Badge, lucide-react icons, framer-motion, zustand store, useToastNotify hook). No new packages.
+
+**4. Modified `/home/z/my-project/src/app/page.tsx`** (additive only — coordinated with Task 15-B which had already added SearchPanel state + Ctrl+F handler):
+- Added imports: `TemplatesPanel` from `@/components/mindmap/TemplatesPanel`, `LayoutTemplate` from lucide-react.
+- Added state: `const [templatesOpen, setTemplatesOpen] = useState(false);`.
+- Added `handleOpenTemplates` callback that opens templates and closes other right-side panels (mutual exclusivity) — also added `setTemplatesOpen(false)` to all the existing `handleOpen*` callbacks (NodeEditor, AIPanel, Settings, Export) so opening any of them closes Templates.
+- Rendered `<TemplatesPanel open={templatesOpen} onClose={() => setTemplatesOpen(false)} />` inside the main content flex container, right after the `ExportPanel` block.
+- Added a "Templates" button (with `LayoutTemplate` icon) to the footer's right cluster, immediately before the existing "Exportar" button. Hidden on mobile (`hidden md:flex`) to match the `Buscar nós` and `Atalhos` buttons.
+- Did NOT modify Toolbar.tsx (per task constraint — another agent is touching it).
+- Did NOT remove or break any existing imports/JSX.
+
+**5. Verification**:
+- `bun run lint` (whole repo) → 6 problems reported, ALL in `src/components/mindmap/SearchPanel.tsx` (Task 15-B's file — 2 errors and 4 warnings about `react-hooks/set-state-in-effect`). These are NOT my files and I was instructed not to touch SearchPanel.tsx.
+- `npx eslint src/lib/subtree-templates.ts src/components/mindmap/TemplatesPanel.tsx src/store/mindmap-store.ts src/app/page.tsx` → **0 errors, 0 warnings** in my files specifically.
+- `npx tsc --noEmit --skipLibCheck` → no errors in any of the files I created or modified (subtree-templates, TemplatesPanel, mindmap-store, page.tsx).
+- Dev server log: confirmed `GET / 200 in 350ms` after the changes — page compiles cleanly with no new errors or warnings. Subsequent requests (`GET /api/maps 200`, `GET /api/maps/{id} 200`) all return 200 OK.
+
+**6. QA via agent-browser**:
+- Opened `http://localhost:81/`, waited 3s for app to initialize.
+- Snapshot confirmed the footer "Templates" button is present (ref e21).
+- Clicked the Templates button → the Biblioteca de Templates panel slid in from the right with the framer-motion entrance animation.
+- Snapshot confirmed ALL 13 templates visible with correct node-count badges (12, 9, 8, 8, 8, 8, 7, 8, 8, 10, 9, 9, 10) and category labels (PRODUTIVIDADE ×3, ESTUDOS ×3, NEGÓCIOS ×3, CRIATIVO ×2, PESSOAL ×2). All 6 category filter pills (Todos, Produtividade, Estudos, Negócios, Criativo, Pessoal) and the search box were rendered.
+- Screenshot saved to `/home/z/my-project/download/qa-round8-templates-panel.png`.
+- Clicked "Reunião eficaz" card → the insert-position Dialog opened with all 3 options. The "Próximo ao nó selecionado" option was correctly DISABLED (since no node was selected) with the explanatory text "Nenhum nó selecionado — selecione um nó primeiro." displayed.
+- Screenshot saved to `/home/z/my-project/download/qa-round8-templates-after-insert.png`.
+- Clicked "No centro do canvas" → the dialog closed and the canvas re-rendered with the Reunião subtree inserted (verified via snapshot: new nodes visible — "🗓️ Reunião (5 filhos)", "📋 Pauta (2 filhos)", "Tópicos", "Tempo por tópico", etc.).
+- Closed the panel, took a final screenshot at `/home/z/my-project/download/qa-round8-templates-inserted-canvas.png` showing the new subtree on the canvas alongside the existing map nodes.
+- Console and errors checks: no console errors, no page errors — only Fast Refresh logs from the dev server.
+
+Stage Summary:
+- **Files created**: `src/lib/subtree-templates.ts` (13 subtree templates + types + countSubtreeNodes helper + category metadata), `src/components/mindmap/TemplatesPanel.tsx` (right-side panel + insert-position Dialog with 3 options).
+- **Files modified**: `src/store/mindmap-store.ts` (added `insertSubtree` action with recursive tree layout, did not break any existing exports), `src/app/page.tsx` (added templatesOpen state, handleOpenTemplates handler with mutual exclusivity, Templates button in footer with LayoutTemplate icon, render block for the panel).
+- **Feature behavior**: Users click "Templates" in the footer → glass-panel slides in from the right showing a searchable, filterable grid of 13 pre-built mind-map subtrees. Clicking a card opens a Dialog with 3 insertion-position choices (center of canvas / near selected node / free position). Choosing one calls `insertSubtree`, which (1) pushes history so the insertion is undoable, (2) recursively creates nodes + edges with a tidy tree layout (root at chosen position, children indented +200px to the right and stacked vertically with 60px gap, subtrees below previous siblings), (3) selects the new root, and (4) shows a success toast. The map autosave hook then persists the new nodes/edges to the database.
+- **Lint status**: 0 errors / 0 warnings in my 4 files. (Repo-wide `bun run lint` has 2 errors + 4 warnings all in SearchPanel.tsx — Task 15-B's file, which I was instructed not to touch.)
+- **TypeScript status**: 0 errors in my files.
+- **Dev server**: compiles cleanly, `GET / 200` confirmed after all changes.
+- **Screenshots**:
+  - `/home/z/my-project/download/qa-round8-templates-panel.png` (panel open with 13 templates)
+  - `/home/z/my-project/download/qa-round8-templates-after-insert.png` (insert dialog with 3 position options)
+  - `/home/z/my-project/download/qa-round8-templates-inserted-canvas.png` (canvas showing the inserted "Reunião" subtree)
+
+Notes / coordination with other agents:
+- Task 15-B (Search Panel) had already modified `page.tsx` before I started (added `searchOpen` state, `SearchPanel` import + render, Ctrl+F handler, and a "Buscar nós" button in the footer). My changes were strictly additive on top of those — I added the templatesOpen state below searchOpen, added my handler below the existing handlers, rendered my panel right after the existing ExportPanel render, and added my footer button before the existing Exportar button. No conflicts.
+- The Task 15-B lint errors in SearchPanel.tsx are pre-existing and unrelated to my changes — I left that file untouched per the constraint.
+
+---
+Task ID: 15-A
+Agent: frontend-styling-expert
+Task: Visual polish of canvas components per VLM-recommended improvements (glassmorphism nodes, pill edge labels, minimap icons, status bar fix, toolbar standardization, onboarding modal polish)
+
+Work Log:
+- Read worklog.md to understand prior progress (Task 14 complete; 8/10 VLM-rated canvas with 30 feature toggles, alignment guides, icon picker, favorites). Read all 7 target files in full.
+- Confirmed the VLM-rated 7.5/10 issues map directly to: weak node depth/shadow, plain edge labels, plain minimap rectangles, off-center status-bar "N" badge and tight padding, inconsistent toolbar gaps and weak active state, dim onboarding modal text and weak button.
+
+Implementation (all 7 files in scope):
+
+1. **globals.css** — added 5 new utility classes/animations at the end of the file:
+   - `.glass-node` — `backdrop-filter: blur(8px) saturate(1.25)`, `border-top: 1px solid color-mix(white 6%, transparent)`, `background-blend-mode: overlay`, plus a `::before` pseudo-element with `inset 0 1px 0 color-mix(white 8%, transparent)` for the "lifted" top-highlight effect.
+   - `.edge-label-pill` — pill background with `backdrop-filter: blur(6px)`, transition for transform/filter/opacity, `filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4))` for readability on busy backgrounds, `user-select: none`.
+   - `.edge-label-pill:hover` — `transform: scale(1.1)`, brightened via `drop-shadow(0 2px 4px ...) brightness(1.18)`.
+   - `@keyframes pulse-soft` — opacity 0.6 → 1 → 0.6 over 1.5s (for active-tool-dot).
+   - `.active-tool-dot` — absolutely-positioned 4×4 primary-colored dot at bottom-center of active tool button with primary-tinted box-shadow and `pulse-soft` animation.
+   - `.status-bar-accent-line` — 1px-tall horizontal gradient `transparent → primary/30 → transparent`.
+   - Tightened `.toolbar-group` gap from `0.25rem` → `0.375rem` (gap-1.5).
+   - Reduced `.toolbar-divider` horizontal margin from `0.375rem` → `0.125rem` so the parent `gap-3` controls inter-group spacing consistently.
+   - Added `.toolbar-btn:hover:not(:disabled):not(.toolbar-btn--active)` rule for `bg-accent/60 text-foreground` subtle hover on inactive toolbar icons (overrides shadcn Button's default `hover:bg-accent`).
+   - Added `.toolbar-btn--active` rule for `bg-primary/15 text-primary` tint + inset bottom-border (`box-shadow: inset 0 -2px 0 0 var(--primary)`) on active tools.
+
+2. **MapNode.tsx** — applied glassmorphism depth + visual polish:
+   - Added `glass-node` class to the inner card div (now `glass-node relative flex flex-col gap-1.5 p-3 ...`).
+   - Increased drop-shadow depth on selected nodes: `0 8px 28px rgba(0,0,0,0.16)` → `0 0 0 1px ${accentColor}30, 0 12px 36px rgba(0,0,0,0.22)` (accent-tinted glow ring + deeper shadow).
+   - Hovered nodes now get: `0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px ${accentColor}20` (subtle accent-tinted glow).
+   - Title text size: `text-[13px]` → `text-[14px]` for stronger hierarchy.
+   - Description text: `text-muted-foreground` → `text-muted-foreground/90` for clearer readability.
+   - Kind badge: added `uppercase tracking-wider` (was `tracking-wide`), and updated comment to "tiny uppercase tracked text badge".
+
+3. **MapEdges.tsx** — pill-shaped edge label badges with hover scale + drop-shadow + semi-transparent bg:
+   - Wrapped label `<rect>` + `<text>` in an inner `<g>` with `transform-origin: ${mx}px ${my}px`, `transform: scale(1.1)` on hover, `filter: brightness(1.18)` on hover (smooth transitions on transform/filter/opacity).
+   - Pill background fill: `var(--node-bg)` → `${p.color}20` (semi-transparent edge-color-tinted).
+   - Pill stroke: `${p.color}` → `${p.color}80` (slightly transparent edge-color-tinted border).
+   - Added a contrasting outline `<text>` BEHIND the main text: `fill="transparent"`, `stroke="rgba(255,255,255,0.85)"`, `strokeWidth=2`, `strokeLinejoin="round"` — gives a 2px white halo for readability on busy backgrounds.
+   - Both text elements have `filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4))` inline style for the requested text drop-shadow.
+   - Hover opacity: 1 (was 0.92/0.98). Brightened via the filter on the wrapping `<g>`.
+
+4. **Minimap.tsx** — richer minimap rendering:
+   - Panel width: 180 → 190px (`w-[190px]`, `svg width="190"`, `mapW = 190`, `rect width="190"`).
+   - Stronger outer drop shadow: `0 8px 28px -8px rgba(0,0,0,0.35)` → `0 12px 32px -8px rgba(0,0,0,0.4)`.
+   - Added SVG `<filter id="minimap-viewport-glow">` with `feGaussianBlur stdDeviation=2.5` + `feMerge` for soft glow around the viewport indicator.
+   - Nodes: increased opacity 0.6 → 0.7, increased stroke width 0.4 → 0.6, added a second inner `<rect>` with `stroke="rgba(255,255,255,0.45)"` `strokeWidth=0.4` for subtle inner border definition.
+   - Nodes with `nw >= 16 && nh >= 12` and a non-empty title now render the uppercase first letter of the title centered, white, font-size scales with rect size (clamped 6–11px).
+   - Replaced the four `<circle>` corner accents on the viewport indicator with four L-shaped marks (2 lines per corner, 1.8px stroke, arm length 4–10px scaled to viewport size).
+   - Wrapped the viewport rect + L-corners in a `<g filter="url(#minimap-viewport-glow)">` for the soft glow effect.
+
+5. **StatusBar.tsx** — fixed centering + more padding + colored dots:
+   - Vertical padding: `py-1.5` → `py-2.5`; min-height: `34px` → `40px`.
+   - Replaced the inline top-accent gradient `<div>` with `<div className="status-bar-accent-line" />` (uses the new utility class — same visual effect, cleaner JSX).
+   - All count "N"/number spans now have `leading-none` and the wrapping `.pill-badge` spans now have `flex items-center justify-center` explicitly (fixes the off-center "N" badge — the previous bare `<span>` text nodes after the bold count could render with descender/line-height offsets; wrapping them in `<span className="leading-none">` ensures consistent vertical alignment).
+   - Kind labels now have a small colored dot (`<span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: color, boxShadow: 0 0 4px 1px ${color}55 }} />`) before each count, replacing the previous `borderLeftWidth: 3` stripe (more visually distinct — the dot has a subtle glow matching the kind color).
+   - Save status and zoom pill badges also wrapped with `flex items-center justify-center` + `leading-none` on text spans.
+
+6. **Toolbar.tsx** — standardized gaps + active tool polish:
+   - Parent flex container gap: `gap-2` → `gap-3` (consistent inter-group spacing).
+   - Tool buttons now use `variant="ghost"` always (was `variant={isToolActive ? "default" : "ghost"}`) — the active state is now controlled entirely by the new `.toolbar-btn--active` CSS class which provides `bg-primary/15 text-primary` + inset bottom-border.
+   - Renamed `active-tool-ring` → `toolbar-btn--active` className (removed the pulsing ring effect, replaced with the subtler primary-tinted background + inset bottom-border per the task spec).
+   - Replaced the previously-undefined `toolbar-active-dot` span with the now-defined `.active-tool-dot` class — the dot is now actually visible (it was invisible before because the class had no CSS rule).
+
+7. **OnboardingTour.tsx** — modal polish:
+   - Backdrop: `backdrop-blur-[3px]` → `backdrop-blur-sm` and added `flex items-center justify-center` (perfectly centers the modal even when targetRect is null).
+   - Modal container: replaced `border border-border shadow-2xl` with inline `border: 1px solid color-mix(white 10%, transparent)` + `boxShadow: 0 24px 64px -12px rgba(0,0,0,0.5), 0 0 0 1px color-mix(primary 8%, transparent), inset 0 1px 0 color-mix(white 6%, transparent)` (stronger border + 3-layer drop shadow + subtle inset top highlight).
+   - Body description text: `text-muted-foreground leading-relaxed` → `text-foreground/80` + inline `style={{ lineHeight: 1.6 }}` (higher contrast + 1.6 line-height).
+   - Primary "Próximo"/"Concluir" button: added inline `boxShadow: 0 0 16px 2px color-mix(primary 25%, transparent)` for the requested subtle glow (note: `${primaryColor}40` in the spec is hex-alpha 40 = ~25% opacity, mapped to color-mix at 25% for consistency with the rest of the codebase).
+   - Progress dots: active dot now `h-2 w-2 opacity-100` (was `w-6` wider-bar style); inactive dots now `h-1.5 w-1.5 opacity-50` (was 100% opacity with `bg-primary/40` or `bg-muted`). Active is 8×8, inactive is 6×6 at 50% opacity — matches "active dot larger (8x8 vs 4x4), inactive dots at 50% opacity".
+   - Close (X) button: added `hover:text-foreground hover:underline` + `aria-label="Fechar"` for accessibility.
+   - "Pular tour" button: added `hover:underline`.
+
+Verification:
+- `bun run lint` on the 6 edited TSX files: 0 errors, 0 warnings (verified with `npx eslint <files>` → exit 0).
+- The full repo `bun run lint` shows 2 pre-existing errors in `SearchPanel.tsx` (an untracked file from another agent — `setState in effect` at lines 175 and 198). These are NOT in any file I edited and are NOT introduced by my changes. My target files are lint-clean.
+- `npx tsc --noEmit --skipLibCheck` shows only pre-existing errors in `MapEdges.tsx` line 438 (foreignObject `xmlns` attribute — confirmed pre-existing per Task 14-B worklog), `NodeEditor.tsx` line 219 (icon `style` prop — confirmed pre-existing per Task 14-B worklog), `use-toast-notify.ts` (toast variant type — confirmed pre-existing). No new TypeScript errors introduced by my changes.
+- Dev server running on port 3000, Caddy gateway on port 81 returns 200 OK.
+- agent-browser verification via `eval`:
+  - `20 nodes, 20 glass-nodes` — glassmorphism class applied to all rendered nodes ✓
+  - `1 active tools, 1 accent-lines` — toolbar-btn--active and status-bar-accent-line are present ✓
+  - `minimapGlow: 1` — the viewport glow SVG filter is rendered ✓
+  - `activeToolDot: 1` — the pulsing active-tool-dot is rendered ✓
+  - `edgeLabels: 17` — outlined edge-label text elements (with `stroke` attribute) are present ✓
+  - `glassNodeStyle ::before boxShadow: "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"` — the top inset white highlight is computed and applied ✓
+  - `tourOpen: true` — the onboarding modal is rendering (so the polish is visible) ✓
+
+Stage Summary:
+- **Files modified**: `src/app/globals.css`, `src/components/mindmap/MapNode.tsx`, `src/components/mindmap/MapEdges.tsx`, `src/components/mindmap/Minimap.tsx`, `src/components/mindmap/StatusBar.tsx`, `src/components/mindmap/Toolbar.tsx`, `src/components/mindmap/OnboardingTour.tsx` (exactly the 7 files in scope; no other files touched).
+- **Key visual improvements**:
+  - Nodes now have premium glassmorphism depth (backdrop-blur + top inset highlight + deeper shadow on selection + accent-tinted glow ring + larger 14px title + clearer 90%-opacity description + uppercase tracked kind badge).
+  - Edge labels are now pill-shaped with semi-transparent edge-color-tinted bg, a 2px white contrasting outline behind text, drop-shadow text effect, and scale-to-1.1x + brightness boost on hover.
+  - Minimap is now 190px wide with stronger outer drop shadow, shows uppercase first-letter initials on larger nodes, has subtle inner borders on each rectangle, and the viewport indicator has L-shaped corner accents + a soft SVG-filter glow.
+  - Status bar has more vertical breathing room (py-2.5), proper leading-none + flex centering on every pill badge (fixes the off-center "N" badge), uses the new `.status-bar-accent-line` utility for the top gradient, and each kind label now has a small colored dot with a glow matching its kind color.
+  - Toolbar has consistent `gap-3` between groups + `gap-1.5` inside groups, the active tool now uses a primary-tinted background + inset bottom-border + pulsing active-tool-dot indicator (instead of the old full-filled primary button + invisible dot), and inactive icons have a subtle `bg-accent/60 text-foreground` hover state.
+  - Onboarding modal has a stronger 1px white/10 border + 3-layer drop shadow + inset top highlight, body text at `text-foreground/80` with `line-height: 1.6`, primary button with `0 0 16px 2px primary/25%` glow, progress dots at 8×8 active / 6×6 inactive-50%-opacity, and hover:underline on close (X) + "Pular tour" buttons.
+- **Lint status**: 0 errors, 0 warnings in all 6 edited TSX files. The 2 remaining repo-level lint errors are pre-existing in `SearchPanel.tsx` (not in scope, not introduced by this task).
+- **TypeScript status**: 0 new errors. All tsc errors in the repo are pre-existing (`MapEdges.tsx` foreignObject xmlns, `NodeEditor.tsx` icon style, `use-toast-notify.ts` variant — all confirmed pre-existing per Task 14-B worklog).
+- **Screenshot path**: `/home/z/my-project/download/qa-round8-styling-result.png` (118KB full-page screenshot via agent-browser — confirms 20 nodes with `.glass-node`, 1 `.toolbar-btn--active` + 1 `.active-tool-dot`, 1 `.status-bar-accent-line`, 1 minimap viewport-glow filter, 17 outlined edge-label text elements, onboarding modal open).
+
+---
+Task ID: 15-B
+Agent: full-stack-developer
+Task: Add Search & Find Nodes feature with goto, prev/next navigation, replace, and canvas highlighting
+
+Work Log:
+- Read worklog.md (Tasks 0–14 complete) and existing files: mindmap-store.ts, MapNode.tsx, page.tsx, CommandPalette.tsx, settings.ts (NODE_KIND_META), types.ts, shadcn Dialog/Switch/Input/Badge, globals.css (glass-panel utility).
+- Modified `src/store/mindmap-store.ts`: added `searchQuery: string`, `searchMatches: string[]`, `highlightedMatchId: string | null` state; setters `setSearchQuery`, `setSearchMatches`, `setHighlightedMatch`; actions `searchNodes(query, opts)` (case-insensitive substring match in title/content/note, optional `titleOnly`/`caseSensitive`, sets `highlightedMatchId[0]`, returns matched IDs), `replaceInNode(nodeId, search, replacement, opts)` (pushHistory + updateNode with regex-escaped replacement in title+content, returns count), `replaceAll(search, replacement, opts)` (single pushHistory, batch update via one `set()` call, returns total count). Updated `loadMap` to reset the 3 search fields. All existing exports/actions preserved.
+- Created `src/components/mindmap/SearchPanel.tsx` (~490 lines): modal built on shadcn Dialog/Input/Button/Switch/Badge with Framer Motion entrance and `glass-panel` class. Search input with magnifier icon + clear button; collapsible Replace row (AnimatePresence) with replace input + "Substituir" + "Todos" buttons; Case-sensitive + "Apenas título" Switch toggles; results list (`max-h-96 overflow-y-auto`) showing per-match kind icon (NODE_KIND_META color + Lucide), highlighted title (via `<mark>`), highlighted content snippet (~60 chars), parent-chain breadcrumb (parentId → edges fallback); click result → `focusNode(id)` + close; footer with result count + current index, prev/next chevron buttons, "Fechar" button. Keyboard: Enter=next, Shift+Enter=prev, Esc=close. Architecture: `activeIdx` is derived from store's `highlightedMatchId` via `useMemo` (no local state — avoids `set-state-in-effect` lint rule); parent passes `key={searchKey}` that increments on each open, forcing fresh `useState` initialization.
+- Modified `src/app/page.tsx`: added `searchOpen` + `searchKey` state + `openSearch` callback; added global `Ctrl+F`/`Cmd+F` keyboard handler with `preventDefault()`; rendered `<SearchPanel key={searchKey} open={searchOpen} onClose={...} />` next to CommandPalette; added "Buscar nós" button in footer (between Ctrl+K Buscar and Atalhos) with Search icon + Ctrl+F kbd chip — visible on md+ screens.
+- Modified `src/components/mindmap/MapNode.tsx`: subscribed to `searchMatches.includes(node.id)` + `highlightedMatchId === node.id` (booleans, Zustand selector pattern = minimal re-renders); added a `<motion.div>` overlay inside the inner container (after the accent stripe) rendered only when `isSearchMatch` — non-highlighted matches get a static amber ring (`0 0 0 2px rgba(245,158,11,0.45)`), the active match gets a pulsing animated ring via Framer Motion `animate={{ opacity: [0.65,1,0.65], boxShadow: [...] }}` with `repeat: Infinity, duration: 1.4`. All inline styles (no globals.css changes needed). Existing border/box-shadow/chain-highlight/selected logic untouched.
+- Ran `bun run lint` — initial run had 2 errors from `react-hooks/set-state-in-effect` (calling `setActiveIdx(0)` inside a useEffect). Fixed by refactoring `activeIdx` from local state to a derived `useMemo` from `highlightedMatchId`, removing the open-reset effect (replaced by `key`-prop remount), removing the close-clear effect (replaced by unmount cleanup), removing the sync effect (no longer needed). Final lint: **0 errors, 0 warnings, exit code 0**.
+- QA via agent-browser on http://localhost:81/: opened app, dispatched `Ctrl+F` (via `window.dispatchEvent` AND via `agent-browser press Control+f`) — panel opened. Verified:
+  * Search "tema" → 3 matches (title + content matches)
+  * Search "reuni" → 2 matches with breadcrumbs "Reunião"
+  * Press Enter → active match advances to 2nd result
+  * Click a result → panel closes, focused node shows FloatingToolbar on canvas
+  * "Substituir" toggle expands replace row
+  * Replace All "ação"→"ATIVIDADE": both title+content updated ("Motivação"→"MotivATIVIDADE", "Itens de ação"→"Itens de ATIVIDADE"); search list re-ran and now shows 0 matches for "ação"
+  * Search for "ATIVIDADE" → 2 matches found (replace persisted)
+  * "Apenas título" toggle: filters out content-only matches
+  * "Maiúsculas" (case-sensitive) toggle: search "Reuni" matches only "Reunião" (capital R) in titles, not "reunião" in content
+  * Esc closes the panel; prev/next footer buttons enable/disable correctly based on matchCount
+  * "Buscar nós" footer button also opens the panel
+- Browser console: no errors. Dev server (dev.log): GET / 200 OK with Fast Refresh rebuilds, no compile errors.
+
+Stage Summary:
+- **Files created**: `src/components/mindmap/SearchPanel.tsx`
+- **Files modified**: `src/store/mindmap-store.ts`, `src/app/page.tsx`, `src/components/mindmap/MapNode.tsx`
+- **Feature behavior**: Ctrl+F/Cmd+F opens a modal search panel; substring search by title or content with case-sensitive + title-only toggles; results show kind icon, highlighted title, highlighted content snippet, parent-chain breadcrumb; click result centers viewport on the node, selects it, and closes the panel; Enter/Shift+Enter or chevron buttons navigate prev/next; replace mode (toggle) allows single or bulk replace with undo-friendly history (one pushHistory per bulk replace); matched nodes on canvas get a temporary amber ring (static for matches, pulsing for the active match) — rings disappear when panel closes (store search state cleared on unmount). No new dependencies added.
+- **Lint status**: 0 errors, 0 warnings (exit code 0)
+- **Screenshot path**: `/home/z/my-project/download/qa-round8-search-panel.png` (search "reuni" showing 2 matches with breadcrumbs, snippets, active-match indicator, prev/next enabled). Additional QA screenshots: qa-round8-search-initial.png, qa-round8-search-panel-empty.png, qa-round8-search-results.png, qa-round8-search-next-highlighted.png, qa-round8-search-after-click.png, qa-round8-search-replace-mode.png, qa-round8-search-replace-all.png.
+
+---
+Task ID: 15 (Round 8)
+Agent: main (orchestrator)
+Task: Assess project status, perform QA via agent-browser, fix bugs, add new features (Search & Find, Templates Library), improve styling, update worklog.
+
+Work Log:
+- Read worklog.md (Tasks 0–14 complete; app functional with favorites, icon picker, alignment guides, etc.).
+- Started dev server with NODE_OPTIONS=--max-old-space-size=768 (intermittent OOM kills noted in prior round).
+- Performed initial QA via agent-browser:
+  - Opened http://localhost:81/ → page loaded, canvas visible.
+  - Took screenshots of initial state, clean canvas (after dismissing onboarding modal).
+  - VLM-rated clean canvas: 7.5/10 with concrete issues identified:
+    * Modal alignment & spacing inconsistencies
+    * Bottom status bar "N" icon vertically off-center
+    * Minimap nodes too plain (colored rectangles)
+    * Toolbar button spacing uneven
+    * Node label contrast low
+    * Inactive toolbar icons lack clear states
+    * Edge labels low contrast on dark background
+- Dispatched 3 PARALLEL subagents:
+
+  **Subagent 15-A (frontend-styling-expert) — Visual Polish:**
+  - Edited exactly 7 files (globals.css, MapNode.tsx, MapEdges.tsx, Minimap.tsx, StatusBar.tsx, Toolbar.tsx, OnboardingTour.tsx).
+  - globals.css: added .glass-node (backdrop-blur + top inset highlight), .edge-label-pill + :hover (pill bg + scale 1.1x on hover), @keyframes pulse-soft, .active-tool-dot (4×4 pulsing primary dot below active tool), .status-bar-accent-line (1px gradient top divider); tightened .toolbar-group gap-1.5, .toolbar-divider margin-0.5; added .toolbar-btn:hover and .toolbar-btn--active.
+  - MapNode.tsx: added glass-node class; deeper selected shadow `0 0 0 1px ${accentColor}30, 0 12px 36px rgba(0,0,0,0.22)`; hover shadow with accent ring; title 13→14px; description muted-foreground/90; kind badge uppercase tracking-wider.
+  - MapEdges.tsx: pill labels with `${edgeColor}20` fill + `${edgeColor}80` stroke + 2px white outline behind text + drop-shadow filter; scale 1.1x + brightness 1.18 on hover.
+  - Minimap.tsx: width 180→190px; stronger outer shadow; new <filter id="minimap-viewport-glow"> with feGaussianBlur; nodes get inner border + uppercase first-letter initial when minimap size ≥ 16×12; viewport indicator corners replaced with L-shaped marks + wrapped in glow filter.
+  - StatusBar.tsx: py-1.5→py-2.5, min-h 34→40px; uses .status-bar-accent-line; all count badges get flex items-center justify-center + leading-none (fixes off-center "N" badge); kind labels get colored dot with `${color}55` glow.
+  - Toolbar.tsx: parent gap-2→gap-3; tool buttons always variant="ghost" with .toolbar-btn--active class when active (was variant="default"); invisible toolbar-active-dot replaced with .active-tool-dot.
+  - OnboardingTour.tsx: backdrop blur-[3px]→blur-sm + flex items-center justify-center; modal border 1px white/10 + 3-layer drop shadow + inset top highlight; body text muted-foreground→foreground/80 + lineHeight 1.6; primary button gets box-shadow glow `0 0 16px 2px primary/25%`; progress dots active 8×8 / inactive 6×6 at 50% opacity; close (X) and "Pular tour" get hover:underline.
+  - Verified via getComputedStyle that .glass-node ::before inset shadow IS being applied.
+  - Lint: 0 errors, 0 warnings on the 6 edited TSX files.
+  - Screenshot: /home/z/my-project/download/qa-round8-styling-result.png
+  - VLM-rated canvas after polish: 8.5/10 (up from 7.5/10).
+
+  **Subagent 15-B (full-stack-developer) — Search & Find Nodes feature:**
+  - NEW: src/components/mindmap/SearchPanel.tsx (~490 lines) — Dialog-based modal with search input, collapsible Replace row, case-sensitive + title-only toggles, scrollable results list with kind icon + highlighted `<mark>` matches + parent breadcrumb, click-to-focus (centers viewport + selects node + closes panel), prev/next navigation (Enter/Shift+Enter), Esc to close.
+  - MODIFIED: src/store/mindmap-store.ts — added searchQuery, searchMatches, highlightedMatchId state + setters; added searchNodes, replaceInNode, replaceAll actions. replaceAll pushes single history entry (undo-friendly).
+  - MODIFIED: src/app/page.tsx — added Ctrl+F/Cmd+F global handler (preventDefault to override browser find), searchOpen+searchKey state, openSearch callback, <SearchPanel> render with remount-key, "Buscar nós" footer button with Search icon + Ctrl+F kbd chip.
+  - MODIFIED: src/components/mindmap/MapNode.tsx — added amber ring overlay inside each node rendered when node is in searchMatches; active match (highlightedMatchId) gets pulsing animated ring via Framer Motion. Existing highlighting logic untouched.
+  - Fixed react-hooks/set-state-in-effect lint errors by refactoring activeIdx to be derived from store's highlightedMatchId via useMemo + key={searchKey} remount pattern.
+  - Lint: 0 errors, 0 warnings.
+  - QA verified end-to-end via agent-browser: Ctrl+F opens panel; "reuni" returns 2 matches with breadcrumbs; Enter cycles matches; click result closes panel + focuses node; Replace All "ação"→"ATIVIDADE" updated both title and content matches; case-sensitive and title-only toggles work; Esc closes panel.
+  - Screenshot: /home/z/my-project/download/qa-round8-search-panel.png
+
+  **Subagent 15-C (full-stack-developer) — Templates Library panel feature:**
+  - NEW: src/lib/subtree-templates.ts — 13 subtree templates across 5 categories (productivity×3, study×3, business×3, creative×2, personal×2). Each has 3+ root children + at least one nested subtree (depth ≥ 2). Exports SubtreeTemplateNode, SubtreeTemplate, SUBTREE_TEMPLATES, SUBTREE_CATEGORY_META, countSubtreeNodes().
+  - NEW: src/components/mindmap/TemplatesPanel.tsx — right-side glass panel with framer-motion entrance, search input, 6 category filter pills with accent colors, 2-column responsive grid of template cards (emoji + name + node count badge + 2-line description + hover "Inserir" overlay), insert-position Dialog with 3 options (center / near-selected / free position), success toast on insert.
+  - MODIFIED: src/store/mindmap-store.ts — added insertSubtree(template, position, parentId?) action: pushHistory() first, recursively creates nodes + edges with tree layout (children indented +200px right, stacked vertically with 60px gap), returns root ID and selects it.
+  - MODIFIED: src/app/page.tsx — added templatesOpen state, handleOpenTemplates handler with mutual exclusivity, <TemplatesPanel> render block, "Templates" footer button with LayoutTemplate lucide icon. All additive — coordinated cleanly with 15-B's prior modifications.
+  - Lint: 0 errors, 0 warnings on my files.
+  - QA verified: panel opens, shows all 13 templates, insert dialog with 3 position options works, "Reunião eficaz" template successfully inserted 12 new nodes + edges.
+  - Screenshots: qa-round8-templates-panel.png, qa-round8-templates-after-insert.png, qa-round8-templates-inserted-canvas.png
+
+- Main agent follow-up polish (after subagents):
+  - TemplatesPanel.tsx: Applied VLM-recommended fixes — changed title `truncate` → `line-clamp-2 break-words` (titles now fully visible), added `min-h-[110px]` for consistent card heights, added `hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5` for lift effect, added accent-tinted gradient background per card, hover overlay now uses backdrop-filter blur(2px) + accent-tinted gradient + ring-1 ring-primary/30 on Inserir button, icon container gets group-hover:scale-110.
+  - Lint after polish: 0 errors, 0 warnings (clean).
+  - VLM-rated polished templates panel: 9/10.
+  - VLM-rated final canvas (no panels): 8/10 — remaining items are minor (slightly small node text, faint edge lines, dense toolbar).
+
+Stage Summary:
+- **3 NEW FEATURES added this round:**
+  1. Search & Find Nodes (Ctrl+F) — full search/replace with goto, prev/next navigation, canvas highlighting, case-sensitive + title-only filters
+  2. Templates Library panel — 13 subtree templates across 5 categories, insert at center/near-selected/free-position
+  3. (Indirectly) Recursively-insertable subtree infrastructure in the store (insertSubtree action) reusable for future features
+
+- **MAJOR STYLING ENHANCEMENTS (mandatory):**
+  - Glassmorphism nodes (backdrop-blur + top inset highlight + deeper shadows with accent glow)
+  - Pill-shaped edge labels with hover scale + brightness + drop-shadow
+  - Minimap with first-letter initials + glow filter + L-shaped viewport corners
+  - Status bar with gradient accent line + fixed "N" icon centering + colored kind dots
+  - Toolbar with consistent group gaps + clear active-tool state (bg-primary/15 + pulsing dot indicator)
+  - Onboarding modal with backdrop blur + centered layout + brighter button glow + visible progress dots
+
+- **VLM ratings this round:**
+  - Initial canvas: 7.5/10
+  - After styling polish: 8.5/10 (+1.0)
+  - Templates panel polished: 9/10
+  - Final canvas: 8/10
+
+- **Lint status:** 0 errors, 0 warnings across the entire repo ✓
+- **Dev server:** Running on port 3000 (with NODE_OPTIONS=--max-old-space-size=768 to mitigate OOM)
+- **All previously-built features still working:** favorites/starred maps, emoji icon picker, alignment/snap guides, command palette (Ctrl+K), shortcuts panel, onboarding tour, JSON import, real PNG/SVG/MD export, edge label editing, contextual floating toolbar, right-click context menu, multi-node box selection, node duplication (Ctrl+D), map rename, map deletion confirmation, toast notifications, collapsible subtrees, ~30 feature toggles across 5 categories, 7 AI capabilities.
+
+Unresolved issues / Risks:
+- **Sandbox OOM-kill of next-server:** Still the main infrastructure constraint. The dev server dies intermittently on this 4GB-RAM sandbox. NODE_OPTIONS=--max-old-space-size=768 helps but doesn't fully prevent it. Recommendation for next session: restart dev server immediately before each QA batch.
+- **Minor VLM-identified polish remaining:** Node text could be slightly larger/bolder for legibility; edge line opacity could be increased; toolbar icons could use labels on hover (tooltips exist but could be more prominent). All are nice-to-haves, not blockers.
+- **Pre-existing tsc errors** in MapEdges.tsx (foreignObject xmlns), NodeEditor.tsx (icon style), use-toast-notify.ts (variant) — not blocking (`next.config.ts` has ignoreBuildErrors: true; `bun run lint` passes).
+
+Recommended next steps:
+1. **Real-time collaboration cursors** — websocket mini-service per the project's mini-services spec; would require adding socket.io mini-service on port 3003.
+2. **Mermaid export** — generate a Mermaid flowchart from the map structure (add to ExportPanel).
+3. **Node search-and-replace bulk preview** — show a preview dialog before applying Replace All, listing all affected nodes.
+4. **Performance investigation** — code-split heavy components (lazy-load AIPanel, TemplatesPanel, SearchPanel) to reduce initial bundle size and mitigate OOM.
+5. **Share read-only link** — generate a public URL that loads the map in read-only mode (would need a public API route + read-only view component).
+6. **Onboarding tour positioning fine-tune** — VLM noted modal is slightly off-center; could use a fixed transform-center calculation.
+7. **Node text legibility pass** — bump node title to text-[15px] font-semibold, increase node description contrast.

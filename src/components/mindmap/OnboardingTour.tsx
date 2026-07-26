@@ -172,7 +172,7 @@ export function OnboardingTour({ forceShow }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[3px]"
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-center justify-center"
             onClick={handleSkip}
           />
 
@@ -220,22 +220,34 @@ export function OnboardingTour({ forceShow }: Props) {
             className="fixed z-[202] w-[320px] max-w-[calc(100vw-32px)] pointer-events-auto"
             style={tooltipStyle}
           >
-            <div className="rounded-xl bg-card border border-border shadow-2xl p-4 backdrop-blur-md">
+            <div
+              className="rounded-xl bg-card p-4 backdrop-blur-md relative"
+              style={{
+                border: "1px solid color-mix(in srgb, white 10%, transparent)",
+                boxShadow:
+                  "0 24px 64px -12px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent), inset 0 1px 0 color-mix(in srgb, white 6%, transparent)",
+              }}
+            >
               {/* Close button */}
               <button
-                className="absolute top-2.5 right-2.5 h-6 w-6 rounded-md flex items-center justify-center hover:bg-accent text-muted-foreground transition-colors"
+                className="absolute top-2.5 right-2.5 h-6 w-6 rounded-md flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground hover:underline transition-colors"
                 onClick={handleSkip}
+                aria-label="Fechar"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
 
-              {/* Step indicator */}
-              <div className="flex items-center gap-1.5 mb-2">
+              {/* Step indicator — active dot larger (8x8), inactive at 50% opacity */}
+              <div className="flex items-center gap-1.5 mb-2.5">
                 {TOUR_STEPS.map((_, i) => (
                   <div
                     key={i}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === step ? "w-6 bg-primary" : i < step ? "w-3 bg-primary/40" : "w-3 bg-muted"
+                    className={`rounded-full transition-all ${
+                      i === step
+                        ? "h-2 w-2 bg-primary opacity-100"
+                        : i < step
+                          ? "h-1.5 w-1.5 bg-primary/50 opacity-50"
+                          : "h-1.5 w-1.5 bg-muted opacity-50"
                     }`}
                   />
                 ))}
@@ -244,13 +256,13 @@ export function OnboardingTour({ forceShow }: Props) {
               {/* Title */}
               <p className="text-sm font-semibold text-foreground mb-1.5">{currentStep.title}</p>
 
-              {/* Description */}
-              <p className="text-xs text-muted-foreground leading-relaxed mb-3">{currentStep.description}</p>
+              {/* Description — higher contrast + 1.6 line-height */}
+              <p className="text-xs text-foreground/80 mb-3" style={{ lineHeight: 1.6 }}>{currentStep.description}</p>
 
               {/* Actions */}
               <div className="flex items-center justify-between">
                 <button
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
                   onClick={handleSkip}
                 >
                   Pular tour
@@ -271,6 +283,9 @@ export function OnboardingTour({ forceShow }: Props) {
                     size="sm"
                     className="h-7 text-xs gap-1"
                     onClick={isLastStep ? handleFinish : handleNext}
+                    style={{
+                      boxShadow: "0 0 16px 2px color-mix(in srgb, var(--primary) 25%, transparent)",
+                    }}
                   >
                     {isLastStep ? (
                       <>
