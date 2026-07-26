@@ -231,7 +231,17 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
                 boxShadow: selected ? `0 0 0 2px ${accentColor}30` : "none",
               }}
             >
-              <Icon className="h-3.5 w-3.5" />
+              {node.icon ? (
+                <span
+                  className="select-none leading-none text-base"
+                  role="img"
+                  aria-label={`Ícone ${node.icon}`}
+                >
+                  {node.icon}
+                </span>
+              ) : (
+                <Icon className="h-3.5 w-3.5" />
+              )}
             </div>
             {/* #2: Kind badge — tiny text badge below the icon */}
             <span

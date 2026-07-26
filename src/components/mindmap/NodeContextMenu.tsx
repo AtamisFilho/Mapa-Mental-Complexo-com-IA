@@ -12,9 +12,11 @@ import {
   Trash2,
   Palette,
   RotateCcw,
+  Smile,
 } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
+import { IconPickerContent } from "@/components/mindmap/IconPicker";
 import { NODE_KIND_META } from "@/lib/settings";
 
 interface ContextMenuState {
@@ -32,6 +34,7 @@ interface Props {
   onToggleCollapse: (nodeId: string) => void;
   onConnectFrom: (nodeId: string) => void;
   onColorChange: (nodeId: string, color: string | null) => void;
+  onIconChange: (nodeId: string, icon: string | null) => void;
   onDelete: (nodeId: string) => void;
 }
 
@@ -67,10 +70,12 @@ export function NodeContextMenu({
   onToggleCollapse,
   onConnectFrom,
   onColorChange,
+  onIconChange,
   onDelete,
 }: Props) {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [showColors, setShowColors] = useState(false);
+  const [showIcons, setShowIcons] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const nodes = useMindMapStore((s) => s.nodes);
@@ -138,6 +143,22 @@ export function NodeContextMenu({
           action: () => { onConnectFrom(node.id); onClose(); },
         },
         {
+          id: "separator-icon",
+          label: "",
+          icon: null,
+          action: () => {},
+        },
+        {
+          id: "icon",
+          label: "Definir ícone",
+          icon: <Smile className="h-4 w-4" />,
+          action: () => {
+            setShowIcons(true);
+            setShowColors(false);
+            setFocusedIndex(-1);
+          },
+        },
+        {
           id: "separator-color",
           label: "",
           icon: null,
@@ -147,7 +168,11 @@ export function NodeContextMenu({
           id: "color",
           label: "Alterar cor",
           icon: <Palette className="h-4 w-4" />,
-          action: () => { setShowColors(true); setFocusedIndex(-1); },
+          action: () => {
+            setShowColors(true);
+            setShowIcons(false);
+            setFocusedIndex(-1);
+          },
         },
         {
           id: "separator-delete",
@@ -172,12 +197,16 @@ export function NodeContextMenu({
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setShowColors(false);
+        if (showColors || showIcons) {
+          setShowColors(false);
+          setShowIcons(false);
+          return;
+        }
         onClose();
         return;
       }
 
-      if (showColors) return; // skip menu nav when color picker is open
+      if (showColors || showIcons) return; // skip menu nav when a sub-picker is open
 
       const actionableItems = menuItemsWithConnect.filter(
         (item) => item.label !== "" && !item.id.startsWith("separator")
@@ -205,7 +234,7 @@ export function NodeContextMenu({
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [menuState, focusedIndex, showColors, menuItemsWithConnect, onClose]);
+  }, [menuState, focusedIndex, showColors, showIcons, menuItemsWithConnect, onClose]);
 
   // Close on click outside
   useEffect(() => {
@@ -213,6 +242,7 @@ export function NodeContextMenu({
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as HTMLElement)) {
         setShowColors(false);
+        setShowIcons(false);
         onClose();
       }
     };
@@ -247,6 +277,16 @@ export function NodeContextMenu({
     [node, onColorChange, onClose]
   );
 
+  const handleIconSelect = useCallback(
+    (icon: string | null) => {
+      if (!node) return;
+      onIconChange(node.id, icon);
+      setShowIcons(false);
+      onClose();
+    },
+    [node, onIconChange, onClose]
+  );
+
   if (!menuState || !node) return null;
 
   const nodeKindMeta = NODE_KIND_META[node.kind];
@@ -259,7 +299,7 @@ export function NodeContextMenu({
 
   // Adjust position so menu doesn't overflow viewport
   const menuWidth = 200;
-  const menuHeight = showColors ? 320 : 260;
+  const menuHeight = showColors || showIcons ? 360 : 260;
   const adjustedX = Math.min(menuState.x, window.innerWidth - menuWidth - 8);
   const adjustedY = Math.min(menuState.y, window.innerHeight - menuHeight - 8);
 
@@ -283,6 +323,47 @@ export function NodeContextMenu({
           // Separator
           if (item.id.startsWith("separator") || item.label === "") {
             return <div key={item.id} className="context-menu-separator" />;
+          }
+
+          // Icon item — opens inline emoji picker
+          if (item.id === "icon") {
+            return (
+              <div key={item.id}>
+                <div
+                  className={`context-menu-item ${
+                    actionableItems[focusedIndex]?.id === "icon"
+                      ? "context-menu-item--focused"
+                      : ""
+                  }`}
+                  onClick={() => item.action()}
+                  onMouseEnter={() => setFocusedIndex(actionableItems.findIndex((a) => a.id === "icon"))}
+                >
+                  <span className="context-menu-icon">
+                    {node.icon ? (
+                      <span className="text-base leading-none">{node.icon}</span>
+                    ) : (
+                      <Smile className="h-4 w-4" />
+                    )}
+                  </span>
+                  {item.label}
+                </div>
+
+                {/* Inline emoji picker */}
+                <AnimatePresence>
+                  {showIcons && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="overflow-hidden"
+                    >
+                      <IconPickerContent onSelect={handleIconSelect} hasIcon={!!node.icon} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
           }
 
           // Color item — opens inline picker

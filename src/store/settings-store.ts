@@ -91,7 +91,27 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "mindmap-settings",
-      version: 1,
+      version: 2,
+      // Deep-merge persisted settings with DEFAULT_SETTINGS so that newly-added
+      // fields (e.g. `editor.alignmentGuides`) get their default value for
+      // users who already have an older persisted state.
+      merge: (persisted, current) => {
+        const p = (persisted as { settings?: Partial<FeatureSettings> } | undefined);
+        const cur = current as SettingsState;
+        if (!p?.settings) return cur;
+        const ps = p.settings;
+        return {
+          ...cur,
+          settings: {
+            ai: { ...DEFAULT_SETTINGS.ai, ...(ps.ai ?? {}) },
+            visual: { ...DEFAULT_SETTINGS.visual, ...(ps.visual ?? {}) },
+            editor: { ...DEFAULT_SETTINGS.editor, ...(ps.editor ?? {}) },
+            performance: { ...DEFAULT_SETTINGS.performance, ...(ps.performance ?? {}) },
+            export: { ...DEFAULT_SETTINGS.export, ...(ps.export ?? {}) },
+            theme: { ...DEFAULT_SETTINGS.theme, ...(ps.theme ?? {}) },
+          },
+        };
+      },
     }
   )
 );

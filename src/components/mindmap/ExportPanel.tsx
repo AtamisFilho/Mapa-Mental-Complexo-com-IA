@@ -504,7 +504,7 @@ export function ExportPanel({ open, onClose }: Props) {
                 </Button>
                 <div className="mt-2 rounded-md bg-muted/50 p-2 text-[10px] text-muted-foreground leading-relaxed border border-border/50">
                   <p className="font-medium text-foreground/80 mb-1">Formato esperado:</p>
-                  <pre className="whitespace-pre-wrap font-mono">{`{ "title": "...", "nodes": [{ "title": "...", "kind": "concept", "x": 0, "y": 0 }], "edges": [{ "sourceId": "n-id-1", "targetId": "n-id-2" }] }`}</pre>
+                  <pre className="whitespace-pre-wrap break-all font-mono text-[9px] leading-tight">{`{ "title": "...", "nodes": [{ "title": "...", "kind": "concept", "x": 0, "y": 0 }], "edges": [{ "sourceId": "n-id-1", "targetId": "n-id-2" }] }`}</pre>
                 </div>
                 {importError && (
                   <div className="mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive">

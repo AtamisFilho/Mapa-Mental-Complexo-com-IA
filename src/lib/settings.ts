@@ -37,6 +37,7 @@ export interface FeatureSettings {
     undoRedo: boolean; // enable undo/redo history
     historyLimit: number; // max history steps
     confirmDelete: boolean; // confirm before deleting
+    alignmentGuides: boolean; // show alignment / snap guides when dragging nodes
   };
   // ── Performance ─────────────────────────────────────
   performance: {
@@ -91,6 +92,7 @@ export const DEFAULT_SETTINGS: FeatureSettings = {
     undoRedo: true,
     historyLimit: 50,
     confirmDelete: true,
+    alignmentGuides: true,
   },
   performance: {
     maxNodes: 500,
@@ -167,6 +169,7 @@ export const SETTING_CATEGORIES: SettingCategoryMeta[] = [
     toggles: [
       { key: "autosave", label: "Salvamento automático", description: "Salva alterações automaticamente." },
       { key: "snapToGrid", label: "Encaixar na grade", description: "Atrai os nós à grade ao mover." },
+      { key: "alignmentGuides", label: "Guias de alinhamento", description: "Mostrar linhas guia ao arrastar nós." },
       { key: "keyboardShortcuts", label: "Atalhos de teclado", description: "Habilita atalhos (Tab, Delete, etc.)." },
       { key: "multiSelect", label: "Multi-seleção", description: "Selecionar vários nós com Shift." },
       { key: "undoRedo", label: "Desfazer/Refazer", description: "Histórico de ações." },

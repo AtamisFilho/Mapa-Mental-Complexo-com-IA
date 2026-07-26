@@ -18,6 +18,141 @@ interface ContextMenuState {
   y: number;
 }
 
+// ── Alignment guides (Task 14-C) ────────────────────────────────────────
+// A guide is a dashed line drawn across the viewport when the dragged
+// node's center / edge snaps into alignment with another visible node.
+interface AlignmentGuide {
+  // "horizontal" → line drawn horizontally at y=position (centers align on Y)
+  // "vertical"   → line drawn vertically   at x=position (centers align on X)
+  type: "horizontal" | "vertical";
+  position: number;
+  // World coords for the distance badge between the dragged node and the matched sibling
+  badgeX: number;
+  badgeY: number;
+  distance: number; // px (rounded)
+}
+
+interface AlignmentResult {
+  guides: AlignmentGuide[];
+  snapX: number | null; // absolute world X to snap the dragged node to (top-left)
+  snapY: number | null; // absolute world Y to snap the dragged node to (top-left)
+}
+
+// Tolerance (in world px) within which an alignment is detected.
+const ALIGNMENT_TOLERANCE = 6;
+// When the visible node count exceeds this, only nodes within CULL_RADIUS of
+// the dragged node are compared — keeps the comparison O(nearby) on huge maps.
+const ALIGNMENT_MAX_NODES = 100;
+const ALIGNMENT_CULL_RADIUS = 1800;
+// How far (in world px) the guide line extends on either side of the viewport.
+// The SVG container is clipped by the canvas, so a very large extent is fine.
+const GUIDE_EXTENT = 100000;
+
+/**
+ * Compute alignment guides for the dragged node against every other visible
+ * node. Also returns the snap target (top-left X / Y of the dragged node) so
+ * the caller can apply a magnetic snap when a guide is active.
+ */
+function computeAlignmentGuides(
+  draggedId: string,
+  draggedX: number,
+  draggedY: number,
+  draggedW: number,
+  draggedH: number,
+  allNodes: { id: string; x: number; y: number; width: number; height: number }[]
+): AlignmentResult {
+  const draggedCx = draggedX + draggedW / 2;
+  const draggedCy = draggedY + draggedH / 2;
+  const draggedRight = draggedX + draggedW;
+  const draggedBottom = draggedY + draggedH;
+
+  const guides: AlignmentGuide[] = [];
+  let snapX: number | null = null;
+  let snapY: number | null = null;
+
+  // Cull to nearby nodes when there are many visible nodes (perf cap).
+  let candidates = allNodes.filter((n) => n.id !== draggedId);
+  if (candidates.length > ALIGNMENT_MAX_NODES) {
+    candidates = candidates.filter((n) => {
+      const dx = Math.abs(n.x + n.width / 2 - draggedCx);
+      const dy = Math.abs(n.y + n.height / 2 - draggedCy);
+      return dx < ALIGNMENT_CULL_RADIUS && dy < ALIGNMENT_CULL_RADIUS;
+    });
+  }
+
+  for (const other of candidates) {
+    const oW = other.width;
+    const oH = other.height;
+    const oCx = other.x + oW / 2;
+    const oCy = other.y + oH / 2;
+    const oRight = other.x + oW;
+    const oBottom = other.y + oH;
+
+    // ── Vertical guide (alignment on the X axis) ───────────────────────
+    // Possible matches: center-X, left edge, right edge.
+    let vertPos: number | null = null;
+    if (Math.abs(draggedCx - oCx) < ALIGNMENT_TOLERANCE) {
+      vertPos = oCx;
+      if (snapX === null) snapX = oCx - draggedW / 2;
+    } else if (Math.abs(draggedX - other.x) < ALIGNMENT_TOLERANCE) {
+      vertPos = other.x;
+      if (snapX === null) snapX = other.x;
+    } else if (Math.abs(draggedRight - oRight) < ALIGNMENT_TOLERANCE) {
+      vertPos = oRight;
+      if (snapX === null) snapX = oRight - draggedW;
+    }
+    if (vertPos !== null) {
+      // Distance along the perpendicular (Y) axis: gap between the two boxes.
+      const isDraggedBelow = draggedY > other.y;
+      const gap = isDraggedBelow
+        ? Math.max(0, draggedY - oBottom)
+        : Math.max(0, other.y - draggedBottom);
+      const badgeY = isDraggedBelow
+        ? (oBottom + draggedY) / 2
+        : (draggedBottom + other.y) / 2;
+      guides.push({
+        type: "vertical",
+        position: vertPos,
+        badgeX: vertPos,
+        badgeY,
+        distance: Math.round(gap),
+      });
+    }
+
+    // ── Horizontal guide (alignment on the Y axis) ────────────────────
+    // Possible matches: center-Y, top edge, bottom edge.
+    let horizPos: number | null = null;
+    if (Math.abs(draggedCy - oCy) < ALIGNMENT_TOLERANCE) {
+      horizPos = oCy;
+      if (snapY === null) snapY = oCy - draggedH / 2;
+    } else if (Math.abs(draggedY - other.y) < ALIGNMENT_TOLERANCE) {
+      horizPos = other.y;
+      if (snapY === null) snapY = other.y;
+    } else if (Math.abs(draggedBottom - oBottom) < ALIGNMENT_TOLERANCE) {
+      horizPos = oBottom;
+      if (snapY === null) snapY = oBottom - draggedH;
+    }
+    if (horizPos !== null) {
+      const isDraggedRight = draggedX > other.x;
+      const gap = isDraggedRight
+        ? Math.max(0, draggedX - oRight)
+        : Math.max(0, other.x - draggedRight);
+      const badgeX = isDraggedRight
+        ? (oRight + draggedX) / 2
+        : (draggedRight + other.x) / 2;
+      guides.push({
+        type: "horizontal",
+        position: horizPos,
+        badgeX,
+        badgeY: horizPos,
+        distance: Math.round(gap),
+      });
+    }
+  }
+
+  return { guides, snapX, snapY };
+}
+
 interface Props {
   onOpenNodeEditor: () => void;
   onOpenAIPanel: () => void;
@@ -61,6 +196,12 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const selectNodes = useMindMapStore((s) => s.selectNode);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
   const multiSelect = useSettingsStore((s) => s.settings.editor.multiSelect);
+  const alignmentGuidesEnabled = useSettingsStore(
+    (s) => s.settings.editor.alignmentGuides ?? true
+  );
+
+  // Active alignment guides while dragging a node. Cleared on pointer-up.
+  const [activeGuides, setActiveGuides] = useState<AlignmentGuide[]>([]);
 
   const showGrid = useSettingsStore((s) => s.settings.visual.grid);
   const snapToGrid = useSettingsStore((s) => s.settings.editor.snapToGrid);
@@ -201,6 +342,14 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     [pushHistory, updateNode]
   );
 
+  const handleContextIconChange = useCallback(
+    (nodeId: string, icon: string | null) => {
+      pushHistory();
+      updateNode(nodeId, { icon });
+    },
+    [pushHistory, updateNode]
+  );
+
   const handleContextDelete = useCallback(
     (nodeId: string) => {
       pushHistory();
@@ -253,6 +402,35 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     [screenToWorld, setConnectingFrom, setCursorWorld]
   );
 
+  // Compute visible nodes: hide descendants of collapsed nodes.
+  // Declared here (above handlePointerMove) so the pointer-move handler can
+  // depend on `visibleNodes` for alignment-guide computation.
+  const visibleNodeIds = useMemo(() => {
+    const collapsedIds = new Set(nodes.filter((n) => n.collapsed).map((n) => n.id));
+    if (collapsedIds.size === 0) return null; // all visible
+    const hidden = new Set<string>();
+    // Build child map
+    const childrenOf = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // BFS from each collapsed node
+    const queue = [...collapsedIds];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!hidden.has(child)) {
+          hidden.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    return hidden;
+  }, [nodes, edges]);
+
+  const visibleNodes = visibleNodeIds ? nodes.filter((n) => !visibleNodeIds.has(n.id)) : nodes;
+
   // Pointer move
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -273,12 +451,56 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       } else if (d.type === "node" && d.nodeId) {
         const worldDx = dx / viewport.zoom;
         const worldDy = dy / viewport.zoom;
-        const newX = snap(d.nodeStartX + worldDx);
-        const newY = snap(d.nodeStartY + worldDy);
+        let newX = snap(d.nodeStartX + worldDx);
+        let newY = snap(d.nodeStartY + worldDy);
+
+        // Alignment guides: detect center / edge alignments with sibling nodes
+        // and (a) render dashed guide lines + distance badges, (b) magnetically
+        // snap the dragged node to the exact aligned position.
+        if (alignmentGuidesEnabled) {
+          const draggedNode = visibleNodes.find((n) => n.id === d.nodeId);
+          if (draggedNode) {
+            const w = draggedNode.width;
+            const h = draggedNode.height;
+            const result = computeAlignmentGuides(
+              d.nodeId,
+              newX,
+              newY,
+              w,
+              h,
+              visibleNodes
+            );
+            // Only update state if the guide set actually changed — avoids
+            // unnecessary re-renders on every pointer-move tick.
+            setActiveGuides((prev) => {
+              if (
+                prev.length === result.guides.length &&
+                prev.every(
+                  (g, i) =>
+                    g.type === result.guides[i].type &&
+                    g.position === result.guides[i].position &&
+                    g.badgeX === result.guides[i].badgeX &&
+                    g.badgeY === result.guides[i].badgeY &&
+                    g.distance === result.guides[i].distance
+                )
+              ) {
+                return prev;
+              }
+              return result.guides;
+            });
+            if (result.snapX !== null) newX = result.snapX;
+            if (result.snapY !== null) newY = result.snapY;
+          } else if (activeGuides.length > 0) {
+            setActiveGuides([]);
+          }
+        } else if (activeGuides.length > 0) {
+          setActiveGuides([]);
+        }
+
         updateNode(d.nodeId, { x: newX, y: newY });
       }
     },
-    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld]
+    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld, alignmentGuidesEnabled, activeGuides.length, visibleNodes]
   );
 
   // Pointer up
@@ -318,6 +540,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     dragRef.current = null;
     setIsDragging(false);
     setDragType(null);
+    // Always clear alignment guides on pointer-up — they should only appear
+    // while a node is being actively dragged.
+    setActiveGuides([]);
   }, [boxSel, viewport, nodes, clearSelection]);
 
   // Wheel zoom
@@ -444,32 +669,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
 
   const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
 
-  // Compute visible nodes: hide descendants of collapsed nodes
-  const visibleNodeIds = useMemo(() => {
-    const collapsedIds = new Set(nodes.filter((n) => n.collapsed).map((n) => n.id));
-    if (collapsedIds.size === 0) return null; // all visible
-    const hidden = new Set<string>();
-    // Build child map
-    const childrenOf = new Map<string, string[]>();
-    for (const e of edges) {
-      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
-      childrenOf.get(e.sourceId)!.push(e.targetId);
-    }
-    // BFS from each collapsed node
-    const queue = [...collapsedIds];
-    while (queue.length) {
-      const cur = queue.shift()!;
-      for (const child of childrenOf.get(cur) ?? []) {
-        if (!hidden.has(child)) {
-          hidden.add(child);
-          queue.push(child);
-        }
-      }
-    }
-    return hidden;
-  }, [nodes, edges]);
-
-  const visibleNodes = visibleNodeIds ? nodes.filter((n) => !visibleNodeIds.has(n.id)) : nodes;
   const visibleEdges = visibleNodeIds
     ? edges.filter((e) => !visibleNodeIds.has(e.sourceId) && !visibleNodeIds.has(e.targetId))
     : edges;
@@ -550,6 +749,76 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
           connectingFrom={connectingFrom}
           cursorWorld={cursorWorld}
         />
+        {/* Alignment / snap guides — rendered ABOVE edges but BELOW nodes
+            (z-order in SVG/HTML is determined by document order, so this
+             layer sits between MapEdges and the node motion.divs). Only
+             rendered while a node is being actively dragged. */}
+        {activeGuides.length > 0 && (
+          <svg
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: 1,
+              height: 1,
+              overflow: "visible",
+              pointerEvents: "none",
+              shapeRendering: "crispEdges",
+            }}
+            aria-hidden="true"
+          >
+            {activeGuides.map((g, i) => {
+              const badgeW = 38;
+              const badgeH = 18;
+              return (
+                <g key={`guide-${i}`}>
+                  {g.type === "horizontal" ? (
+                    <line
+                      className="alignment-guide"
+                      x1={-GUIDE_EXTENT}
+                      y1={g.position}
+                      x2={GUIDE_EXTENT}
+                      y2={g.position}
+                      stroke="#ec4899"
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : (
+                    <line
+                      className="alignment-guide"
+                      x1={g.position}
+                      y1={-GUIDE_EXTENT}
+                      x2={g.position}
+                      y2={GUIDE_EXTENT}
+                      stroke="#ec4899"
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {/* Distance badge between the dragged node and the matched sibling */}
+                  <rect
+                    className="alignment-guide-badge-bg"
+                    x={g.badgeX - badgeW / 2}
+                    y={g.badgeY - badgeH / 2}
+                    width={badgeW}
+                    height={badgeH}
+                    rx={4}
+                  />
+                  <text
+                    className="alignment-guide-badge"
+                    x={g.badgeX}
+                    y={g.badgeY + 3.5}
+                    textAnchor="middle"
+                  >
+                    {g.distance}px
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        )}
         <AnimatePresence>
           {visibleNodes.map((node) => (
             <MapNodeView
@@ -641,6 +910,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         onToggleCollapse={handleContextToggleCollapse}
         onConnectFrom={handleContextConnectFrom}
         onColorChange={handleContextColorChange}
+        onIconChange={handleContextIconChange}
         onDelete={handleContextDelete}
       />
     </div>

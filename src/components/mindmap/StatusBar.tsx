@@ -30,11 +30,20 @@ export function StatusBar() {
   }
 
   return (
-    <div className="grid grid-cols-3 items-center px-4 py-1.5 border-t border-border/60 backdrop-blur-md text-xs gap-3 min-h-[32px]"
+    <div className="grid grid-cols-3 items-center px-4 py-1.5 border-t backdrop-blur-md text-xs gap-3 min-h-[34px] relative"
       style={{
-        background: "linear-gradient(90deg, var(--card) 0%, color-mix(in srgb, var(--card) 95%, var(--muted)) 50%, var(--card) 100%)",
+        background: "linear-gradient(180deg, color-mix(in srgb, var(--card) 95%, transparent) 0%, var(--card) 100%)",
+        borderColor: "color-mix(in srgb, var(--border) 75%, transparent)",
+        boxShadow: "0 -2px 12px -4px rgba(0,0,0,0.18), inset 0 1px 0 color-mix(in srgb, var(--primary) 16%, transparent)",
       }}
     >
+      {/* Top accent gradient line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--primary) 35%, transparent) 30%, color-mix(in srgb, var(--primary) 35%, transparent) 70%, transparent 100%)",
+        }}
+      />
       {/* Left section: Count badges with subtle gradient separator */}
       <div className="flex items-center gap-2 min-w-0 overflow-hidden">
         <span className="pill-badge shrink-0" style={{ borderLeftWidth: 3, borderLeftColor: "var(--primary)" }}>

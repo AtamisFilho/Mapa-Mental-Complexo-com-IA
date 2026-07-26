@@ -283,12 +283,12 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       {/* Group 4: Search bar — more prominent */}
       <button
         onClick={onOpenSearch}
-        className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-lg border border-border bg-muted/40 hover:bg-accent transition-colors text-sm text-muted-foreground toolbar-search-btn"
+        className="hidden md:flex items-center gap-2 h-9 pl-3 pr-1.5 rounded-lg border border-border bg-muted/40 hover:bg-accent transition-colors text-sm text-muted-foreground toolbar-search-btn"
         data-tooltip="Buscar (Ctrl+K)"
       >
         <Search className="h-4 w-4" />
         <span className="font-medium">Buscar...</span>
-        <kbd className="ml-3 text-[10px] bg-background px-1.5 py-0.5 rounded border border-border font-mono">⌘K</kbd>
+        <kbd className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-md border border-primary/30 font-mono font-semibold tracking-wide shadow-sm">⌘K</kbd>
       </button>
       <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors md:hidden toolbar-btn" onClick={onOpenSearch} data-tooltip="Buscar (Ctrl+K)">
         <Search className="h-4 w-4" />

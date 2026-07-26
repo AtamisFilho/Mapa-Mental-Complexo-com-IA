@@ -379,8 +379,8 @@ export function AIPanel({ open, onClose }: Props) {
             )}
             <Button
               size="sm"
-              className={`h-8 text-xs gap-1.5 w-full transition-opacity ${
-                !selectedNode || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+              className={`h-8 text-xs gap-1.5 w-full transition-all ${
+                !selectedNode || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
               }`}
               disabled={!selectedNode || loading !== null}
               onClick={handleExpand}
@@ -417,8 +417,8 @@ export function AIPanel({ open, onClose }: Props) {
             </div>
             <Button
               size="sm"
-              className={`h-8 text-xs gap-1.5 w-full transition-opacity ${
-                !topic.trim() || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+              className={`h-8 text-xs gap-1.5 w-full transition-all ${
+                !topic.trim() || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
               }`}
               disabled={!topic.trim() || loading !== null}
               onClick={handleGenerate}
@@ -445,8 +445,8 @@ export function AIPanel({ open, onClose }: Props) {
             )}
             <Button
               size="sm"
-              className={`h-8 text-xs gap-1.5 w-full transition-opacity ${
-                !selectedNode || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+              className={`h-8 text-xs gap-1.5 w-full transition-all ${
+                !selectedNode || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
               }`}
               disabled={!selectedNode || loading !== null}
               onClick={handleSummarize}
@@ -471,8 +471,8 @@ export function AIPanel({ open, onClose }: Props) {
             </div>
             <Button
               size="sm"
-              className={`h-8 text-xs gap-1.5 w-full transition-opacity ${
-                nodes.length < 2 || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+              className={`h-8 text-xs gap-1.5 w-full transition-all ${
+                nodes.length < 2 || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
               }`}
               disabled={nodes.length < 2 || loading !== null}
               onClick={handleSuggest}
@@ -580,8 +580,8 @@ export function AIPanel({ open, onClose }: Props) {
             )}
             <Button
               size="sm"
-              className={`h-8 text-xs gap-1.5 w-full transition-opacity ${
-                !selectedNode || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+              className={`h-8 text-xs gap-1.5 w-full transition-all ${
+                !selectedNode || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
               }`}
               disabled={!selectedNode || loading !== null}
               onClick={handleImage}
@@ -607,8 +607,8 @@ export function AIPanel({ open, onClose }: Props) {
           <Button
             variant="outline"
             size="sm"
-            className={`h-8 text-xs gap-1.5 w-full hover:border-primary/40 transition-opacity ${
-              nodes.length === 0 || loading !== null ? "opacity-40 cursor-not-allowed" : ""
+            className={`h-8 text-xs gap-1.5 w-full hover:border-primary/40 transition-all ${
+              nodes.length === 0 || loading !== null ? "opacity-50 grayscale cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted" : ""
             }`}
             disabled={nodes.length === 0 || loading !== null}
             onClick={handleLayout}

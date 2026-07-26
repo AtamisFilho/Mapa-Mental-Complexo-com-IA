@@ -580,3 +580,32 @@
   height: 1rem;
   flex-shrink: 0;
 }
+
+/* ── Alignment guides (Task 14-C) ─────────────────── */
+
+/* SVG <line> elements used as snap guides while dragging nodes.
+   Drawn magenta dashed with a subtle opacity pulse so the user notices them. */
+.alignment-guide {
+  pointer-events: none;
+  animation: guide-pulse 0.8s ease-in-out infinite;
+}
+@keyframes guide-pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.5; }
+}
+
+/* Small badge shown next to a guide indicating the pixel distance
+   between the dragged node and the matched sibling along the axis. */
+.alignment-guide-badge {
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 600;
+  fill: #ffffff;
+}
+.alignment-guide-badge-bg {
+  pointer-events: none;
+  fill: #ec4899;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+  opacity: 0.95;
+}

@@ -16,6 +16,7 @@ import {
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useToastNotify } from "@/hooks/use-toast-notify";
+import { IconPicker } from "@/components/mindmap/IconPicker";
 import { NODE_KIND_META } from "@/lib/settings";
 
 interface Props {
@@ -135,6 +136,20 @@ export function FloatingToolbar({ onOpenNodeEditor, onExpand, onConnectFrom }: P
     setColorPickerOpen(false);
   }, [nodeId, pushHistory, updateNode]);
 
+  const handleIconChange = useCallback(
+    (icon: string | null) => {
+      if (!nodeId) return;
+      pushHistory();
+      updateNode(nodeId, { icon });
+      if (icon) {
+        toast({ title: "Ícone definido", variant: "success" });
+      } else {
+        toast({ title: "Ícone removido", variant: "default" });
+      }
+    },
+    [nodeId, pushHistory, updateNode, toast]
+  );
+
   const handleExpand = useCallback(() => {
     onExpand?.();
   }, [onExpand]);
@@ -227,6 +242,16 @@ export function FloatingToolbar({ onOpenNodeEditor, onExpand, onConnectFrom }: P
 
               {/* Divider */}
               <div className="h-6 w-px bg-border/60" />
+
+              {/* Icon (emoji) picker button — opens popover */}
+              <IconPicker
+                value={node.icon}
+                onSelect={handleIconChange}
+                variant="icon"
+                align="center"
+                stopPropagation
+                buttonClassName="h-8 w-8 rounded-lg flex items-center justify-center text-foreground transition-all duration-150 hover:bg-accent/60 hover:text-accent-foreground"
+              />
 
               {/* Color picker button */}
               <div data-color-picker className="relative">

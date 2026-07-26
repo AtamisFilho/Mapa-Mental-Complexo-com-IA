@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { IconPicker } from "@/components/mindmap/IconPicker";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useToastNotify } from "@/hooks/use-toast-notify";
@@ -124,6 +125,20 @@ export function NodeEditor({ open, onClose }: Props) {
       pushHistory();
       updateNode(node.id, { color });
       toast({ title: "Cor alterada", description: "A cor do nó foi atualizada.", variant: "success" });
+    },
+    [node, pushHistory, updateNode, toast]
+  );
+
+  const handleIconChange = useCallback(
+    (icon: string | null) => {
+      if (!node) return;
+      pushHistory();
+      updateNode(node.id, { icon });
+      if (icon) {
+        toast({ title: "Ícone definido", description: "O ícone do nó foi atualizado.", variant: "success" });
+      } else {
+        toast({ title: "Ícone removido", description: "O ícone do nó foi removido.", variant: "default" });
+      }
     },
     [node, pushHistory, updateNode, toast]
   );
@@ -255,6 +270,22 @@ export function NodeEditor({ open, onClose }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-border/60" />
+
+          {/* ── Icon (emoji picker) ──────────────────────── */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Ícone</label>
+            <IconPicker
+              value={node.icon}
+              onSelect={handleIconChange}
+              variant="labeled"
+              label="Escolher emoji"
+              align="start"
+              stopPropagation
+            />
           </div>
 
           {/* Divider */}
