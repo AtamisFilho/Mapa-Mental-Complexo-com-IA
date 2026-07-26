@@ -165,9 +165,9 @@
 .canvas-grid-bg {
   background-color: var(--canvas-bg);
   background-image:
-    radial-gradient(circle, var(--canvas-grid) 1.4px, transparent 1.4px),
-    repeating-linear-gradient(0deg, transparent, transparent 27px, var(--canvas-grid-highlight) 27px, var(--canvas-grid-highlight) 27.5px, transparent 27.5px),
-    repeating-linear-gradient(90deg, transparent, transparent 27px, var(--canvas-grid-highlight) 27px, var(--canvas-grid-highlight) 27.5px, transparent 27.5px);
+    radial-gradient(circle, var(--canvas-grid) 1.2px, transparent 1.2px),
+    repeating-linear-gradient(0deg, transparent, transparent 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27.3px, transparent 27.3px),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27.3px, transparent 27.3px);
   background-size: 28px 28px, 28px 28px, 28px 28px;
   background-position: 0 0, 0 0, 0 0;
 }
@@ -183,6 +183,13 @@
 
 .canvas-plain-bg {
   background-color: var(--canvas-bg);
+}
+
+/* Canvas dots background — simple dot pattern without cross-hatch */
+.canvas-dots-bg {
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 /* ── Custom scrollbars — smoother appearance ─────────── */

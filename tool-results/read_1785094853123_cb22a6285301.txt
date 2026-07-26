@@ -1,0 +1,919 @@
+     1→"use client";
+     2→
+     3→import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+     4→import { AnimatePresence } from "framer-motion";
+     5→import { Sparkles } from "lucide-react";
+     6→import { useMindMapStore } from "@/store/mindmap-store";
+     7→import { useSettingsStore } from "@/store/settings-store";
+     8→import { useTool } from "@/hooks/use-tool-context";
+     9→import { NODE_KIND_META } from "@/lib/settings";
+    10→import type { NodeKind } from "@/lib/types";
+    11→import { MapNodeView } from "./MapNode";
+    12→import { MapEdges } from "./MapEdges";
+    13→import { NodeContextMenu } from "./NodeContextMenu";
+    14→
+    15→interface ContextMenuState {
+    16→  nodeId: string;
+    17→  x: number;
+    18→  y: number;
+    19→}
+    20→
+    21→// ── Alignment guides (Task 14-C) ────────────────────────────────────────
+    22→// A guide is a dashed line drawn across the viewport when the dragged
+    23→// node's center / edge snaps into alignment with another visible node.
+    24→interface AlignmentGuide {
+    25→  // "horizontal" → line drawn horizontally at y=position (centers align on Y)
+    26→  // "vertical"   → line drawn vertically   at x=position (centers align on X)
+    27→  type: "horizontal" | "vertical";
+    28→  position: number;
+    29→  // World coords for the distance badge between the dragged node and the matched sibling
+    30→  badgeX: number;
+    31→  badgeY: number;
+    32→  distance: number; // px (rounded)
+    33→}
+    34→
+    35→interface AlignmentResult {
+    36→  guides: AlignmentGuide[];
+    37→  snapX: number | null; // absolute world X to snap the dragged node to (top-left)
+    38→  snapY: number | null; // absolute world Y to snap the dragged node to (top-left)
+    39→}
+    40→
+    41→// Tolerance (in world px) within which an alignment is detected.
+    42→const ALIGNMENT_TOLERANCE = 6;
+    43→// When the visible node count exceeds this, only nodes within CULL_RADIUS of
+    44→// the dragged node are compared — keeps the comparison O(nearby) on huge maps.
+    45→const ALIGNMENT_MAX_NODES = 100;
+    46→const ALIGNMENT_CULL_RADIUS = 1800;
+    47→// How far (in world px) the guide line extends on either side of the viewport.
+    48→// The SVG container is clipped by the canvas, so a very large extent is fine.
+    49→const GUIDE_EXTENT = 100000;
+    50→
+    51→/**
+    52→ * Compute alignment guides for the dragged node against every other visible
+    53→ * node. Also returns the snap target (top-left X / Y of the dragged node) so
+    54→ * the caller can apply a magnetic snap when a guide is active.
+    55→ */
+    56→function computeAlignmentGuides(
+    57→  draggedId: string,
+    58→  draggedX: number,
+    59→  draggedY: number,
+    60→  draggedW: number,
+    61→  draggedH: number,
+    62→  allNodes: { id: string; x: number; y: number; width: number; height: number }[]
+    63→): AlignmentResult {
+    64→  const draggedCx = draggedX + draggedW / 2;
+    65→  const draggedCy = draggedY + draggedH / 2;
+    66→  const draggedRight = draggedX + draggedW;
+    67→  const draggedBottom = draggedY + draggedH;
+    68→
+    69→  const guides: AlignmentGuide[] = [];
+    70→  let snapX: number | null = null;
+    71→  let snapY: number | null = null;
+    72→
+    73→  // Cull to nearby nodes when there are many visible nodes (perf cap).
+    74→  let candidates = allNodes.filter((n) => n.id !== draggedId);
+    75→  if (candidates.length > ALIGNMENT_MAX_NODES) {
+    76→    candidates = candidates.filter((n) => {
+    77→      const dx = Math.abs(n.x + n.width / 2 - draggedCx);
+    78→      const dy = Math.abs(n.y + n.height / 2 - draggedCy);
+    79→      return dx < ALIGNMENT_CULL_RADIUS && dy < ALIGNMENT_CULL_RADIUS;
+    80→    });
+    81→  }
+    82→
+    83→  for (const other of candidates) {
+    84→    const oW = other.width;
+    85→    const oH = other.height;
+    86→    const oCx = other.x + oW / 2;
+    87→    const oCy = other.y + oH / 2;
+    88→    const oRight = other.x + oW;
+    89→    const oBottom = other.y + oH;
+    90→
+    91→    // ── Vertical guide (alignment on the X axis) ───────────────────────
+    92→    // Possible matches: center-X, left edge, right edge.
+    93→    let vertPos: number | null = null;
+    94→    if (Math.abs(draggedCx - oCx) < ALIGNMENT_TOLERANCE) {
+    95→      vertPos = oCx;
+    96→      if (snapX === null) snapX = oCx - draggedW / 2;
+    97→    } else if (Math.abs(draggedX - other.x) < ALIGNMENT_TOLERANCE) {
+    98→      vertPos = other.x;
+    99→      if (snapX === null) snapX = other.x;
+   100→    } else if (Math.abs(draggedRight - oRight) < ALIGNMENT_TOLERANCE) {
+   101→      vertPos = oRight;
+   102→      if (snapX === null) snapX = oRight - draggedW;
+   103→    }
+   104→    if (vertPos !== null) {
+   105→      // Distance along the perpendicular (Y) axis: gap between the two boxes.
+   106→      const isDraggedBelow = draggedY > other.y;
+   107→      const gap = isDraggedBelow
+   108→        ? Math.max(0, draggedY - oBottom)
+   109→        : Math.max(0, other.y - draggedBottom);
+   110→      const badgeY = isDraggedBelow
+   111→        ? (oBottom + draggedY) / 2
+   112→        : (draggedBottom + other.y) / 2;
+   113→      guides.push({
+   114→        type: "vertical",
+   115→        position: vertPos,
+   116→        badgeX: vertPos,
+   117→        badgeY,
+   118→        distance: Math.round(gap),
+   119→      });
+   120→    }
+   121→
+   122→    // ── Horizontal guide (alignment on the Y axis) ────────────────────
+   123→    // Possible matches: center-Y, top edge, bottom edge.
+   124→    let horizPos: number | null = null;
+   125→    if (Math.abs(draggedCy - oCy) < ALIGNMENT_TOLERANCE) {
+   126→      horizPos = oCy;
+   127→      if (snapY === null) snapY = oCy - draggedH / 2;
+   128→    } else if (Math.abs(draggedY - other.y) < ALIGNMENT_TOLERANCE) {
+   129→      horizPos = other.y;
+   130→      if (snapY === null) snapY = other.y;
+   131→    } else if (Math.abs(draggedBottom - oBottom) < ALIGNMENT_TOLERANCE) {
+   132→      horizPos = oBottom;
+   133→      if (snapY === null) snapY = oBottom - draggedH;
+   134→    }
+   135→    if (horizPos !== null) {
+   136→      const isDraggedRight = draggedX > other.x;
+   137→      const gap = isDraggedRight
+   138→        ? Math.max(0, draggedX - oRight)
+   139→        : Math.max(0, other.x - draggedRight);
+   140→      const badgeX = isDraggedRight
+   141→        ? (oRight + draggedX) / 2
+   142→        : (draggedRight + other.x) / 2;
+   143→      guides.push({
+   144→        type: "horizontal",
+   145→        position: horizPos,
+   146→        badgeX,
+   147→        badgeY: horizPos,
+   148→        distance: Math.round(gap),
+   149→      });
+   150→    }
+   151→  }
+   152→
+   153→  return { guides, snapX, snapY };
+   154→}
+   155→
+   156→interface Props {
+   157→  onOpenNodeEditor: () => void;
+   158→  onOpenAIPanel: () => void;
+   159→}
+   160→
+   161→export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
+   162→  const containerRef = useRef<HTMLDivElement>(null);
+   163→  const [isDragging, setIsDragging] = useState(false);
+   164→  const [dragType, setDragType] = useState<"node" | "pan" | "box" | null>(null);
+   165→  const [boxSel, setBoxSel] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+   166→  const dragRef = useRef<{
+   167→    type: "node" | "pan" | "box";
+   168→    nodeId?: string;
+   169→    startX: number;
+   170→    startY: number;
+   171→    nodeStartX: number;
+   172→    nodeStartY: number;
+   173→    vpStartX: number;
+   174→    vpStartY: number;
+   175→  } | null>(null);
+   176→
+   177→  const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld, setTool } = useTool();
+   178→
+   179→  // Context menu state
+   180→  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+   181→
+   182→  const nodes = useMindMapStore((s) => s.nodes);
+   183→  const edges = useMindMapStore((s) => s.edges);
+   184→  const viewport = useMindMapStore((s) => s.viewport);
+   185→  const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
+   186→  const clearSelection = useMindMapStore((s) => s.clearSelection);
+   187→  const updateNode = useMindMapStore((s) => s.updateNode);
+   188→  const addNode = useMindMapStore((s) => s.addNode);
+   189→  const addEdge = useMindMapStore((s) => s.addEdge);
+   190→  const panBy = useMindMapStore((s) => s.panBy);
+   191→  const zoomBy = useMindMapStore((s) => s.zoomBy);
+   192→  const pushHistory = useMindMapStore((s) => s.pushHistory);
+   193→  const focusNode = useMindMapStore((s) => s.focusNode);
+   194→  const deleteNode = useMindMapStore((s) => s.deleteNode);
+   195→  const duplicateNode = useMindMapStore((s) => s.duplicateNode);
+   196→  const selectNodes = useMindMapStore((s) => s.selectNode);
+   197→  const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+   198→  const multiSelect = useSettingsStore((s) => s.settings.editor.multiSelect);
+   199→  const alignmentGuidesEnabled = useSettingsStore(
+   200→    (s) => s.settings.editor.alignmentGuides ?? true
+   201→  );
+   202→
+   203→  // Active alignment guides while dragging a node. Cleared on pointer-up.
+   204→  const [activeGuides, setActiveGuides] = useState<AlignmentGuide[]>([]);
+   205→
+   206→  const showGrid = useSettingsStore((s) => s.settings.visual.grid);
+   207→  const snapToGrid = useSettingsStore((s) => s.settings.editor.snapToGrid);
+   208→  const gridSize = useSettingsStore((s) => s.settings.editor.gridSize);
+   209→  const confirmDelete = useSettingsStore((s) => s.settings.editor.confirmDelete);
+   210→  const undoRedo = useSettingsStore((s) => s.settings.editor.undoRedo);
+   211→  const shortcutsEnabled = useSettingsStore((s) => s.settings.editor.keyboardShortcuts);
+   212→  const undo = useMindMapStore((s) => s.undo);
+   213→  const redo = useMindMapStore((s) => s.redo);
+   214→  const fitToView = useMindMapStore((s) => s.fitToView);
+   215→
+   216→  // Convert screen coords to world coords
+   217→  const screenToWorld = useCallback(
+   218→    (sx: number, sy: number) => {
+   219→      const rect = containerRef.current?.getBoundingClientRect();
+   220→      if (!rect) return { x: 0, y: 0 };
+   221→      return {
+   222→        x: (sx - rect.left - viewport.x) / viewport.zoom,
+   223→        y: (sy - rect.top - viewport.y) / viewport.zoom,
+   224→      };
+   225→    },
+   226→    [viewport]
+   227→  );
+   228→
+   229→  // Snap to grid
+   230→  const snap = useCallback(
+   231→    (val: number) => {
+   232→      if (!snapToGrid) return val;
+   233→      return Math.round(val / gridSize) * gridSize;
+   234→    },
+   235→    [snapToGrid, gridSize]
+   236→  );
+   237→
+   238→  // Canvas background click — deselect or add node
+   239→  const handleCanvasPointerDown = useCallback(
+   240→    (e: React.PointerEvent) => {
+   241→      if (e.target !== containerRef.current && !(e.target as HTMLElement).dataset?.canvas) return;
+   242→      if (tool === "pan") {
+   243→        dragRef.current = {
+   244→          type: "pan",
+   245→          startX: e.clientX,
+   246→          startY: e.clientY,
+   247→          vpStartX: viewport.x,
+   248→          vpStartY: viewport.y,
+   249→          nodeStartX: 0,
+   250→          nodeStartY: 0,
+   251→        };
+   252→        setIsDragging(true);
+   253→        setDragType("pan");
+   254→        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+   255→        return;
+   256→      }
+   257→      // Select tool + empty canvas click → start box selection
+   258→      if (tool === "select" && multiSelect) {
+   259→        dragRef.current = {
+   260→          type: "box",
+   261→          startX: e.clientX,
+   262→          startY: e.clientY,
+   263→          vpStartX: 0,
+   264→          vpStartY: 0,
+   265→          nodeStartX: 0,
+   266→          nodeStartY: 0,
+   267→        };
+   268→        setIsDragging(true);
+   269→        setDragType("box");
+   270→        setBoxSel({ startX: e.clientX, startY: e.clientY, endX: e.clientX, endY: e.clientY });
+   271→        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+   272→        return;
+   273→      }
+   274→      clearSelection();
+   275→      setConnectingFrom(null);
+   276→      setCursorWorld(null);
+   277→    },
+   278→    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld, multiSelect]
+   279→  );
+   280→
+   281→  // Node right-click handler — open context menu
+   282→  const handleNodeContextMenu = useCallback(
+   283→    (e: React.MouseEvent, id: string) => {
+   284→      e.preventDefault();
+   285→      e.stopPropagation();
+   286→      selectNodes(id, false);
+   287→      setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
+   288→    },
+   289→    [selectNodes]
+   290→  );
+   291→
+   292→  // Context menu callbacks
+   293→  const handleContextEdit = useCallback(
+   294→    (nodeId: string) => {
+   295→      selectNodes(nodeId, false);
+   296→      onOpenNodeEditor();
+   297→    },
+   298→    [selectNodes, onOpenNodeEditor]
+   299→  );
+   300→
+   301→  const handleContextExpand = useCallback(
+   302→    (nodeId: string) => {
+   303→      selectNodes(nodeId, false);
+   304→      onOpenAIPanel();
+   305→    },
+   306→    [selectNodes, onOpenAIPanel]
+   307→  );
+   308→
+   309→  const handleContextDuplicate = useCallback(
+   310→    (nodeId: string) => {
+   311→      pushHistory();
+   312→      duplicateNode(nodeId);
+   313→    },
+   314→    [pushHistory, duplicateNode]
+   315→  );
+   316→
+   317→  const handleContextToggleCollapse = useCallback(
+   318→    (nodeId: string) => {
+   319→      toggleCollapse(nodeId);
+   320→    },
+   321→    [toggleCollapse]
+   322→  );
+   323→
+   324→  const handleContextConnectFrom = useCallback(
+   325→    (nodeId: string) => {
+   326→      selectNodes(nodeId, false);
+   327→      setTool("connect");
+   328→      setConnectingFrom(nodeId);
+   329→    },
+   330→    [selectNodes, setTool, setConnectingFrom]
+   331→  );
+   332→
+   333→  const handleContextColorChange = useCallback(
+   334→    (nodeId: string, color: string | null) => {
+   335→      pushHistory();
+   336→      if (color !== null) {
+   337→        updateNode(nodeId, { color });
+   338→      } else {
+   339→        updateNode(nodeId, { color: null });
+   340→      }
+   341→    },
+   342→    [pushHistory, updateNode]
+   343→  );
+   344→
+   345→  const handleContextIconChange = useCallback(
+   346→    (nodeId: string, icon: string | null) => {
+   347→      pushHistory();
+   348→      updateNode(nodeId, { icon });
+   349→    },
+   350→    [pushHistory, updateNode]
+   351→  );
+   352→
+   353→  const handleContextDelete = useCallback(
+   354→    (nodeId: string) => {
+   355→      pushHistory();
+   356→      deleteNode(nodeId);
+   357→    },
+   358→    [pushHistory, deleteNode]
+   359→  );
+   360→
+   361→  // Node pointer down — start drag or connect
+   362→  const handleNodePointerDown = useCallback(
+   363→    (e: React.PointerEvent, id: string) => {
+   364→      e.stopPropagation();
+   365→      if (tool === "connect") {
+   366→        if (connectingFrom) {
+   367→          addEdge(connectingFrom, id);
+   368→          setConnectingFrom(null);
+   369→          setCursorWorld(null);
+   370→        } else {
+   371→          setConnectingFrom(id);
+   372→        }
+   373→        return;
+   374→      }
+   375→      const node = nodes.find((n) => n.id === id);
+   376→      if (!node) return;
+   377→      pushHistory();
+   378→      dragRef.current = {
+   379→        type: "node",
+   380→        nodeId: id,
+   381→        startX: e.clientX,
+   382→        startY: e.clientY,
+   383→        nodeStartX: node.x,
+   384→        nodeStartY: node.y,
+   385→        vpStartX: 0,
+   386→        vpStartY: 0,
+   387→      };
+   388→      setIsDragging(true);
+   389→      setDragType("node");
+   390→    },
+   391→    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld]
+   392→  );
+   393→
+   394→  // Connect handle pointer down
+   395→  const handleConnectHandle = useCallback(
+   396→    (e: React.PointerEvent, id: string) => {
+   397→      e.stopPropagation();
+   398→      setConnectingFrom(id);
+   399→      const world = screenToWorld(e.clientX, e.clientY);
+   400→      setCursorWorld(world);
+   401→    },
+   402→    [screenToWorld, setConnectingFrom, setCursorWorld]
+   403→  );
+   404→
+   405→  // Compute visible nodes: hide descendants of collapsed nodes.
+   406→  // Declared here (above handlePointerMove) so the pointer-move handler can
+   407→  // depend on `visibleNodes` for alignment-guide computation.
+   408→  const visibleNodeIds = useMemo(() => {
+   409→    const collapsedIds = new Set(nodes.filter((n) => n.collapsed).map((n) => n.id));
+   410→    if (collapsedIds.size === 0) return null; // all visible
+   411→    const hidden = new Set<string>();
+   412→    // Build child map
+   413→    const childrenOf = new Map<string, string[]>();
+   414→    for (const e of edges) {
+   415→      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+   416→      childrenOf.get(e.sourceId)!.push(e.targetId);
+   417→    }
+   418→    // BFS from each collapsed node
+   419→    const queue = [...collapsedIds];
+   420→    while (queue.length) {
+   421→      const cur = queue.shift()!;
+   422→      for (const child of childrenOf.get(cur) ?? []) {
+   423→        if (!hidden.has(child)) {
+   424→          hidden.add(child);
+   425→          queue.push(child);
+   426→        }
+   427→      }
+   428→    }
+   429→    return hidden;
+   430→  }, [nodes, edges]);
+   431→
+   432→  const visibleNodes = visibleNodeIds ? nodes.filter((n) => !visibleNodeIds.has(n.id)) : nodes;
+   433→
+   434→  // Pointer move
+   435→  const handlePointerMove = useCallback(
+   436→    (e: React.PointerEvent) => {
+   437→      if (connectingFrom) {
+   438→        const world = screenToWorld(e.clientX, e.clientY);
+   439→        setCursorWorld(world);
+   440→      }
+   441→      if (!dragRef.current || !isDragging) return;
+   442→      const d = dragRef.current;
+   443→      const dx = e.clientX - d.startX;
+   444→      const dy = e.clientY - d.startY;
+   445→
+   446→      if (d.type === "pan") {
+   447→        panBy(dx, dy);
+   448→        dragRef.current = { ...d, startX: e.clientX, startY: e.clientY };
+   449→      } else if (d.type === "box") {
+   450→        setBoxSel({ startX: d.startX, startY: d.startY, endX: e.clientX, endY: e.clientY });
+   451→      } else if (d.type === "node" && d.nodeId) {
+   452→        const worldDx = dx / viewport.zoom;
+   453→        const worldDy = dy / viewport.zoom;
+   454→        let newX = snap(d.nodeStartX + worldDx);
+   455→        let newY = snap(d.nodeStartY + worldDy);
+   456→
+   457→        // Alignment guides: detect center / edge alignments with sibling nodes
+   458→        // and (a) render dashed guide lines + distance badges, (b) magnetically
+   459→        // snap the dragged node to the exact aligned position.
+   460→        if (alignmentGuidesEnabled) {
+   461→          const draggedNode = visibleNodes.find((n) => n.id === d.nodeId);
+   462→          if (draggedNode) {
+   463→            const w = draggedNode.width;
+   464→            const h = draggedNode.height;
+   465→            const result = computeAlignmentGuides(
+   466→              d.nodeId,
+   467→              newX,
+   468→              newY,
+   469→              w,
+   470→              h,
+   471→              visibleNodes
+   472→            );
+   473→            // Only update state if the guide set actually changed — avoids
+   474→            // unnecessary re-renders on every pointer-move tick.
+   475→            setActiveGuides((prev) => {
+   476→              if (
+   477→                prev.length === result.guides.length &&
+   478→                prev.every(
+   479→                  (g, i) =>
+   480→                    g.type === result.guides[i].type &&
+   481→                    g.position === result.guides[i].position &&
+   482→                    g.badgeX === result.guides[i].badgeX &&
+   483→                    g.badgeY === result.guides[i].badgeY &&
+   484→                    g.distance === result.guides[i].distance
+   485→                )
+   486→              ) {
+   487→                return prev;
+   488→              }
+   489→              return result.guides;
+   490→            });
+   491→            if (result.snapX !== null) newX = result.snapX;
+   492→            if (result.snapY !== null) newY = result.snapY;
+   493→          } else if (activeGuides.length > 0) {
+   494→            setActiveGuides([]);
+   495→          }
+   496→        } else if (activeGuides.length > 0) {
+   497→          setActiveGuides([]);
+   498→        }
+   499→
+   500→        updateNode(d.nodeId, { x: newX, y: newY });
+   501→      }
+   502→    },
+   503→    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld, alignmentGuidesEnabled, activeGuides.length, visibleNodes]
+   504→  );
+   505→
+   506→  // Pointer up
+   507→  const handlePointerUp = useCallback(() => {
+   508→    const d = dragRef.current;
+   509→    if (d?.type === "box" && boxSel) {
+   510→      // Convert box to world coords, then select nodes within
+   511→      const rect = containerRef.current?.getBoundingClientRect();
+   512→      if (rect) {
+   513→        const x1 = Math.min(boxSel.startX, boxSel.endX) - rect.left;
+   514→        const y1 = Math.min(boxSel.startY, boxSel.endY) - rect.top;
+   515→        const x2 = Math.max(boxSel.startX, boxSel.endX) - rect.left;
+   516→        const y2 = Math.max(boxSel.startY, boxSel.endY) - rect.top;
+   517→        // World-space rect
+   518→        const wx1 = (x1 - viewport.x) / viewport.zoom;
+   519→        const wy1 = (y1 - viewport.y) / viewport.zoom;
+   520→        const wx2 = (x2 - viewport.x) / viewport.zoom;
+   521→        const wy2 = (y2 - viewport.y) / viewport.zoom;
+   522→        const hits = nodes.filter(
+   523→          (n) => n.x + n.width >= wx1 && n.x <= wx2 && n.y + n.height >= wy1 && n.y <= wy2
+   524→        );
+   525→        // Box-select only when meaningful drag (>=4px), else treat as click → clear
+   526→        const movedEnough = Math.abs(boxSel.endX - boxSel.startX) > 4 || Math.abs(boxSel.endY - boxSel.startY) > 4;
+   527→        if (movedEnough) {
+   528→          if (hits.length > 0) {
+   529→            // Replace selection with hits
+   530→            useMindMapStore.setState({ selectedNodeIds: hits.map((n) => n.id), selectedEdgeIds: [] });
+   531→          } else {
+   532→            clearSelection();
+   533→          }
+   534→        } else {
+   535→          clearSelection();
+   536→        }
+   537→      }
+   538→      setBoxSel(null);
+   539→    }
+   540→    dragRef.current = null;
+   541→    setIsDragging(false);
+   542→    setDragType(null);
+   543→    // Always clear alignment guides on pointer-up — they should only appear
+   544→    // while a node is being actively dragged.
+   545→    setActiveGuides([]);
+   546→  }, [boxSel, viewport, nodes, clearSelection]);
+   547→
+   548→  // Wheel zoom
+   549→  const handleWheel = useCallback(
+   550→    (e: React.WheelEvent) => {
+   551→      e.preventDefault();
+   552→      const factor = e.deltaY < 0 ? 1.08 : 0.92;
+   553→      const rect = containerRef.current?.getBoundingClientRect();
+   554→      if (!rect) return;
+   555→      const cx = e.clientX - rect.left;
+   556→      const cy = e.clientY - rect.top;
+   557→      zoomBy(factor, cx, cy);
+   558→    },
+   559→    [zoomBy]
+   560→  );
+   561→
+   562→  // Double click on canvas — add node. Double click on node → open editor.
+   563→  const handleDoubleClick = useCallback(
+   564→    (e: React.MouseEvent) => {
+   565→      const target = e.target as HTMLElement;
+   566→      const isCanvasBg = target === containerRef.current || !!target.dataset?.canvas;
+   567→      if (!isCanvasBg) {
+   568→        // Was a node double-click? Look for data-node-id
+   569→        const nodeEl = target.closest("[data-node-id]") as HTMLElement | null;
+   570→        if (nodeEl?.dataset.nodeId) {
+   571→          // Select and open editor
+   572→          selectNodes(nodeEl.dataset.nodeId, false);
+   573→          onOpenNodeEditor();
+   574→          return;
+   575→        }
+   576→        return;
+   577→      }
+   578→      const world = screenToWorld(e.clientX, e.clientY);
+   579→      const id = addNode({
+   580→        title: "Novo conceito",
+   581→        x: snap(world.x - 100),
+   582→        y: snap(world.y - 40),
+   583→        kind: "concept",
+   584→        width: 220,
+   585→        height: 88,
+   586→      });
+   587→      focusNode(id);
+   588→      onOpenNodeEditor();
+   589→    },
+   590→    [screenToWorld, addNode, snap, focusNode, onOpenNodeEditor, selectNodes]
+   591→  );
+   592→
+   593→  // Keyboard shortcuts
+   594→  useEffect(() => {
+   595→    const handler = (e: KeyboardEvent) => {
+   596→      // Skip if user is typing in an input/textarea/contenteditable
+   597→      const target = e.target as HTMLElement;
+   598→      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+   599→        return;
+   600→      }
+   601→      // Duplicate node: Ctrl/Cmd+D
+   602→      if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
+   603→        if (selectedNodeIds.length > 0) {
+   604→          e.preventDefault();
+   605→          pushHistory();
+   606→          // Duplicate the first selected node
+   607→          duplicateNode(selectedNodeIds[0]);
+   608→        }
+   609→        return;
+   610→      }
+   611→      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+   612→        if (!undoRedo) return;
+   613→        e.preventDefault();
+   614→        undo();
+   615→        return;
+   616→      }
+   617→      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) {
+   618→        if (!undoRedo) return;
+   619→        e.preventDefault();
+   620→        redo();
+   621→        return;
+   622→      }
+   623→      if (e.key === "Delete" || e.key === "Backspace") {
+   624→        if (selectedNodeIds.length > 0 && !confirmDelete) {
+   625→          for (const id of selectedNodeIds) {
+   626→            deleteNode(id);
+   627→          }
+   628→        }
+   629→        return;
+   630→      }
+   631→      if (e.key === "Escape") {
+   632→        clearSelection();
+   633→        setConnectingFrom(null);
+   634→        return;
+   635→      }
+   636→      if (!shortcutsEnabled) return;
+   637→      // Fit to view
+   638→      if (e.key === "f" || e.key === "F") {
+   639→        e.preventDefault();
+   640→        fitToView(80);
+   641→        return;
+   642→      }
+   643→      // Add node shortcuts: C/P/A/I/R/O
+   644→      const keyMap: Record<string, NodeKind> = {
+   645→        c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
+   646→      };
+   647→      const k = e.key.toLowerCase();
+   648→      if (keyMap[k]) {
+   649→        e.preventDefault();
+   650→        const cx = window.innerWidth / 2;
+   651→        const cy = window.innerHeight / 2;
+   652→        const wx = (cx - viewport.x) / viewport.zoom - 110;
+   653→        const wy = (cy - viewport.y) / viewport.zoom - 44;
+   654→        addNode({ title: "Novo " + NODE_KIND_META[keyMap[k]].label, kind: keyMap[k], x: wx, y: wy, width: 220, height: 88 });
+   655→        return;
+   656→      }
+   657→      // E or Enter — open Node Editor for the selected node
+   658→      if (k === "e" || e.key === "Enter") {
+   659→        if (selectedNodeIds.length > 0) {
+   660→          e.preventDefault();
+   661→          onOpenNodeEditor();
+   662→        }
+   663→        return;
+   664→      }
+   665→    };
+   666→    window.addEventListener("keydown", handler);
+   667→    return () => window.removeEventListener("keydown", handler);
+   668→  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor]);
+   669→
+   670→  const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
+   671→
+   672→  const visibleEdges = visibleNodeIds
+   673→    ? edges.filter((e) => !visibleNodeIds.has(e.sourceId) && !visibleNodeIds.has(e.targetId))
+   674→    : edges;
+   675→
+   676→  // Compute highlighted nodes (ancestors + descendants of selected nodes)
+   677→  const highlightedNodeIds = useMemo(() => {
+   678→    if (selectedNodeIds.length === 0) return new Set<string>();
+   679→    const highlighted = new Set<string>();
+   680→    // Build parent map and child map from edges
+   681→    const parentOf = new Map<string, string>(); // child → parent
+   682→    const childrenOf = new Map<string, string[]>(); // parent → children
+   683→    for (const e of edges) {
+   684→      parentOf.set(e.targetId, e.sourceId);
+   685→      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+   686→      childrenOf.get(e.sourceId)!.push(e.targetId);
+   687→    }
+   688→    // For each selected node, trace ancestors upward
+   689→    for (const selId of selectedNodeIds) {
+   690→      let current = parentOf.get(selId);
+   691→      while (current) {
+   692→        if (!selectedNodeIds.includes(current)) highlighted.add(current);
+   693→        current = parentOf.get(current);
+   694→      }
+   695→    }
+   696→    // For each selected node, trace descendants downward
+   697→    const queue = [...selectedNodeIds];
+   698→    while (queue.length) {
+   699→      const cur = queue.shift()!;
+   700→      for (const child of childrenOf.get(cur) ?? []) {
+   701→        if (!selectedNodeIds.includes(child) && !highlighted.has(child)) {
+   702→          highlighted.add(child);
+   703→          queue.push(child);
+   704→        }
+   705→      }
+   706→    }
+   707→    return highlighted;
+   708→  }, [selectedNodeIds, edges]);
+   709→
+   710→  return (
+   711→    <div
+   712→      ref={containerRef}
+   713→      data-canvas="true"
+   714→      className={`relative flex-1 overflow-hidden ${bgClass}`}
+   715→      style={{
+   716→        cursor:
+   717→          isDragging && dragType === "pan"
+   718→            ? "grabbing"
+   719→            : tool === "pan"
+   720→              ? "grab"
+   721→              : tool === "connect"
+   722→                ? "crosshair"
+   723→                : isDragging
+   724→                  ? "grabbing"
+   725→                  : "default",
+   726→      }}
+   727→      onPointerDown={handleCanvasPointerDown}
+   728→      onPointerMove={handlePointerMove}
+   729→      onPointerUp={handlePointerUp}
+   730→      onWheel={handleWheel}
+   731→      onDoubleClick={handleDoubleClick}
+   732→      onContextMenu={(e) => e.preventDefault()}
+   733→    >
+   734→      {/* transform layer */}
+   735→      <div
+   736→        data-canvas="true"
+   737→        style={{
+   738→          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+   739→          transformOrigin: "0 0",
+   740→          position: "absolute",
+   741→          left: 0,
+   742→          top: 0,
+   743→          willChange: "transform",
+   744→        }}
+   745→      >
+   746→        <MapEdges
+   747→          nodes={visibleNodes}
+   748→          edges={visibleEdges}
+   749→          connectingFrom={connectingFrom}
+   750→          cursorWorld={cursorWorld}
+   751→        />
+   752→        {/* Alignment / snap guides — rendered ABOVE edges but BELOW nodes
+   753→            (z-order in SVG/HTML is determined by document order, so this
+   754→             layer sits between MapEdges and the node motion.divs). Only
+   755→             rendered while a node is being actively dragged. */}
+   756→        {activeGuides.length > 0 && (
+   757→          <svg
+   758→            style={{
+   759→              position: "absolute",
+   760→              left: 0,
+   761→              top: 0,
+   762→              width: 1,
+   763→              height: 1,
+   764→              overflow: "visible",
+   765→              pointerEvents: "none",
+   766→              shapeRendering: "crispEdges",
+   767→            }}
+   768→            aria-hidden="true"
+   769→          >
+   770→            {activeGuides.map((g, i) => {
+   771→              const badgeW = 38;
+   772→              const badgeH = 18;
+   773→              return (
+   774→                <g key={`guide-${i}`}>
+   775→                  {g.type === "horizontal" ? (
+   776→                    <line
+   777→                      className="alignment-guide"
+   778→                      x1={-GUIDE_EXTENT}
+   779→                      y1={g.position}
+   780→                      x2={GUIDE_EXTENT}
+   781→                      y2={g.position}
+   782→                      stroke="#ec4899"
+   783→                      strokeWidth={1}
+   784→                      strokeDasharray="4 4"
+   785→                      vectorEffect="non-scaling-stroke"
+   786→                    />
+   787→                  ) : (
+   788→                    <line
+   789→                      className="alignment-guide"
+   790→                      x1={g.position}
+   791→                      y1={-GUIDE_EXTENT}
+   792→                      x2={g.position}
+   793→                      y2={GUIDE_EXTENT}
+   794→                      stroke="#ec4899"
+   795→                      strokeWidth={1}
+   796→                      strokeDasharray="4 4"
+   797→                      vectorEffect="non-scaling-stroke"
+   798→                    />
+   799→                  )}
+   800→                  {/* Distance badge between the dragged node and the matched sibling */}
+   801→                  <rect
+   802→                    className="alignment-guide-badge-bg"
+   803→                    x={g.badgeX - badgeW / 2}
+   804→                    y={g.badgeY - badgeH / 2}
+   805→                    width={badgeW}
+   806→                    height={badgeH}
+   807→                    rx={4}
+   808→                  />
+   809→                  <text
+   810→                    className="alignment-guide-badge"
+   811→                    x={g.badgeX}
+   812→                    y={g.badgeY + 3.5}
+   813→                    textAnchor="middle"
+   814→                  >
+   815→                    {g.distance}px
+   816→                  </text>
+   817→                </g>
+   818→              );
+   819→            })}
+   820→          </svg>
+   821→        )}
+   822→        <AnimatePresence>
+   823→          {visibleNodes.map((node) => (
+   824→            <MapNodeView
+   825→              key={node.id}
+   826→              node={node}
+   827→              onPointerDown={handleNodePointerDown}
+   828→              onConnectHandle={handleConnectHandle}
+   829→              onContextMenu={handleNodeContextMenu}
+   830→              isHighlighted={highlightedNodeIds.has(node.id)}
+   831→            />
+   832→          ))}
+   833→        </AnimatePresence>
+   834→      </div>
+   835→
+   836→      {/* Empty state hint */}
+   837→      {nodes.length === 0 && !isDragging && (
+   838→        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+   839→          <div className="text-center max-w-md px-6">
+   840→            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center relative">
+   841→              <Sparkles className="h-8 w-8 text-primary" />
+   842→              <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-ping opacity-30" />
+   843→            </div>
+   844→            <p className="text-lg font-semibold brand-gradient mb-1">Comece seu mapa mental</p>
+   845→            <p className="text-sm text-muted-foreground mb-3">
+   846→              Clique duplo no canvas para adicionar um nó, ou use o botão <strong className="text-foreground">Adicionar</strong> na barra.
+   847→            </p>
+   848→            <div className="flex flex-wrap gap-1.5 justify-center text-[10px] text-muted-foreground mb-3">
+   849→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">C</kbd> Conceito</span>
+   850→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta</span>
+   851→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação</span>
+   852→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia</span>
+   853→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
+   854→              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> Buscar</span>
+   855→            </div>
+   856→            <p className="text-[11px] text-muted-foreground/70 italic">
+   857→              Dica: explore os <strong className="text-foreground/80">templates</strong> no painel Mapas (botão no canto esquerdo).
+   858→            </p>
+   859→          </div>
+   860→        </div>
+   861→      )}
+   862→
+   863→      {/* Connection mode indicator */}
+   864→      {tool === "connect" && !connectingFrom && (
+   865→        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+   866→          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
+   867→            Clique em um nó para iniciar a conexão
+   868→          </div>
+   869→        </div>
+   870→      )}
+   871→      {connectingFrom && (
+   872→        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+   873→          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
+   874→            Clique em outro nó para completar a conexão · Esc para cancelar
+   875→          </div>
+   876→        </div>
+   877→      )}
+   878→
+   879→      {/* Box-selection visual */}
+   880→      {boxSel && (
+   881→        <div
+   882→          className="absolute pointer-events-none border-2 border-primary/60 bg-primary/15 rounded-sm z-40"
+   883→          style={{
+   884→            left: Math.min(boxSel.startX, boxSel.endX),
+   885→            top: Math.min(boxSel.startY, boxSel.endY),
+   886→            width: Math.abs(boxSel.endX - boxSel.startX),
+   887→            height: Math.abs(boxSel.endY - boxSel.startY),
+   888→          }}
+   889→        />
+   890→      )}
+   891→
+   892→      {/* Selection info badge when multiple nodes selected */}
+   893→      {selectedNodeIds.length > 1 && !isDragging && (
+   894→        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
+   895→          <div className="bg-card/95 border border-border text-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in flex items-center gap-1.5">
+   896→            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+   897→            {selectedNodeIds.length} nós selecionados · <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Del</kbd> excluir · <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Ctrl+D</kbd> duplicar 1º
+   898→          </div>
+   899→        </div>
+   900→      )}
+   901→
+   902→      {/* Node context menu */}
+   903→      <NodeContextMenu
+   904→        key={contextMenu?.nodeId ?? "none"}
+   905→        menuState={contextMenu}
+   906→        onClose={() => setContextMenu(null)}
+   907→        onEdit={handleContextEdit}
+   908→        onExpand={handleContextExpand}
+   909→        onDuplicate={handleContextDuplicate}
+   910→        onToggleCollapse={handleContextToggleCollapse}
+   911→        onConnectFrom={handleContextConnectFrom}
+   912→        onColorChange={handleContextColorChange}
+   913→        onIconChange={handleContextIconChange}
+   914→        onDelete={handleContextDelete}
+   915→      />
+   916→    </div>
+   917→  );
+   918→}
+   919→

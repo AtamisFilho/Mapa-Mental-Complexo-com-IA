@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
+import { useToastNotify } from "@/hooks/use-toast-notify";
 import { NODE_KIND_META } from "@/lib/settings";
 import type { NodeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
@@ -174,6 +175,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     vpStartY: number;
   } | null>(null);
 
+  const { toast } = useToastNotify();
+
   const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld, setTool } = useTool();
 
   // Context menu state
@@ -195,6 +198,13 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const duplicateNode = useMindMapStore((s) => s.duplicateNode);
   const selectNodes = useMindMapStore((s) => s.selectNode);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+  // Reparent (Task 16-B)
+  const reparentTargetId = useMindMapStore((s) => s.reparentTargetId);
+  const draggedNodeId = useMindMapStore((s) => s.draggedNodeId);
+  const setReparentTarget = useMindMapStore((s) => s.setReparentTarget);
+  const setDraggedNode = useMindMapStore((s) => s.setDraggedNode);
+  const reparentNode = useMindMapStore((s) => s.reparentNode);
+  const isDescendantOf = useMindMapStore((s) => s.isDescendantOf);
   const multiSelect = useSettingsStore((s) => s.settings.editor.multiSelect);
   const alignmentGuidesEnabled = useSettingsStore(
     (s) => s.settings.editor.alignmentGuides ?? true
@@ -203,7 +213,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   // Active alignment guides while dragging a node. Cleared on pointer-up.
   const [activeGuides, setActiveGuides] = useState<AlignmentGuide[]>([]);
 
-  const showGrid = useSettingsStore((s) => s.settings.visual.grid);
   const snapToGrid = useSettingsStore((s) => s.settings.editor.snapToGrid);
   const gridSize = useSettingsStore((s) => s.settings.editor.gridSize);
   const confirmDelete = useSettingsStore((s) => s.settings.editor.confirmDelete);
@@ -375,6 +384,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       const node = nodes.find((n) => n.id === id);
       if (!node) return;
       pushHistory();
+      setDraggedNode(id); // Task 16-B: mark node as being dragged
       dragRef.current = {
         type: "node",
         nodeId: id,
@@ -388,7 +398,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       setIsDragging(true);
       setDragType("node");
     },
-    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld]
+    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode]
   );
 
   // Connect handle pointer down
@@ -498,14 +508,59 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         }
 
         updateNode(d.nodeId, { x: newX, y: newY });
+
+        // ── Reparent detection (Task 16-B) ────────────────────────────────
+        // Check if the dragged node's center overlaps with another node's
+        // bounding box. If so, that node becomes the reparent target.
+        const draggedNodeCurrent = visibleNodes.find((n) => n.id === d.nodeId);
+        if (draggedNodeCurrent) {
+          const draggedCx = newX + draggedNodeCurrent.width / 2;
+          const draggedCy = newY + draggedNodeCurrent.height / 2;
+
+          let newTarget: string | null = null;
+          for (const other of visibleNodes) {
+            if (other.id === d.nodeId) continue; // skip self
+            // Check if dragged center is inside other node's bounding box
+            if (
+              draggedCx >= other.x &&
+              draggedCx <= other.x + other.width &&
+              draggedCy >= other.y &&
+              draggedCy <= other.y + other.height
+            ) {
+              // Validate: cannot reparent to own descendant
+              if (!isDescendantOf(other.id, d.nodeId)) {
+                newTarget = other.id;
+              }
+              break; // only one target at a time
+            }
+          }
+          setReparentTarget(newTarget);
+        }
       }
     },
-    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld, alignmentGuidesEnabled, activeGuides.length, visibleNodes]
+    [isDragging, connectingFrom, viewport.zoom, panBy, updateNode, snap, screenToWorld, setCursorWorld, alignmentGuidesEnabled, activeGuides.length, visibleNodes, setReparentTarget, isDescendantOf]
   );
 
   // Pointer up
   const handlePointerUp = useCallback(() => {
     const d = dragRef.current;
+    // ── Reparent execution (Task 16-B) ──────────────────────────────────
+    if (d?.type === "node" && d.nodeId && reparentTargetId) {
+      const success = reparentNode(d.nodeId, reparentTargetId);
+      if (success) {
+        const targetNode = nodes.find((n) => n.id === reparentTargetId);
+        toast({
+          title: `Nó movido para ${targetNode?.title ?? "nó"}`,
+          variant: "success",
+        });
+      }
+      setReparentTarget(null);
+      setDraggedNode(null);
+    } else {
+      setReparentTarget(null);
+      setDraggedNode(null);
+    }
+
     if (d?.type === "box" && boxSel) {
       // Convert box to world coords, then select nodes within
       const rect = containerRef.current?.getBoundingClientRect();
@@ -543,7 +598,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     // Always clear alignment guides on pointer-up — they should only appear
     // while a node is being actively dragged.
     setActiveGuides([]);
-  }, [boxSel, viewport, nodes, clearSelection]);
+  }, [boxSel, viewport, nodes, clearSelection, reparentTargetId, reparentNode, setReparentTarget, setDraggedNode, toast]);
 
   // Wheel zoom
   const handleWheel = useCallback(
@@ -667,7 +722,11 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor]);
 
-  const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
+  const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
+  const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
+    : canvasBackground === "gradient" ? "canvas-gradient-bg"
+    : canvasBackground === "dots" ? "canvas-dots-bg"
+    : "canvas-plain-bg";
 
   const visibleEdges = visibleNodeIds
     ? edges.filter((e) => !visibleNodeIds.has(e.sourceId) && !visibleNodeIds.has(e.targetId))
@@ -828,6 +887,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
               onConnectHandle={handleConnectHandle}
               onContextMenu={handleNodeContextMenu}
               isHighlighted={highlightedNodeIds.has(node.id)}
+              isReparentTarget={reparentTargetId === node.id}
+              isBeingDraggedForReparent={draggedNodeId === node.id}
             />
           ))}
         </AnimatePresence>

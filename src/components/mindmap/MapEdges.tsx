@@ -283,10 +283,10 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             d={p.d}
             fill="none"
             stroke={p.color}
-            strokeWidth={p.selected ? 3.5 : 2.4}
+            strokeWidth={p.selected ? 3.5 : 2.8}
             strokeDasharray={p.dash}
             strokeLinecap="round"
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.9 : 0.8}
+            opacity={p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
             className={p.selected ? "edge-animated-dash" : undefined}
             style={{ transition: "stroke-width 0.15s ease, opacity 0.15s ease" }}
           />
@@ -305,7 +305,7 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
               return `${tipX},${tipY} ${p1x},${p1y} ${p2x},${p2y}`;
             })()}
             fill={p.color}
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.7 : 0.5}
+            opacity={p.selected ? 1 : p.isNodeConnected ? 0.9 : 0.75}
             style={{ transition: "opacity 0.15s ease" }}
           />
           {/* Edge label with pill background, hover scale + brighter, contrasting text outline */}

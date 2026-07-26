@@ -1305,3 +1305,182 @@ Recommended next steps:
 5. **Share read-only link** — generate a public URL that loads the map in read-only mode (would need a public API route + read-only view component).
 6. **Onboarding tour positioning fine-tune** — VLM noted modal is slightly off-center; could use a fixed transform-center calculation.
 7. **Node text legibility pass** — bump node title to text-[15px] font-semibold, increase node description contrast.
+
+---
+Task ID: 16-A
+Agent: full-stack-developer
+Task: Add Mermaid export format + Canvas background customization setting
+
+Work Log:
+- Read worklog.md (Tasks 0–15 complete; app functional with search, templates, styling polish, etc.)
+- Read existing files: settings.ts, settings-store.ts, ExportPanel.tsx, SettingsPanel.tsx, MindMapCanvas.tsx, globals.css
+- Added `mermaid: boolean` field to `FeatureSettings.export` (default: true) and `canvasBackground: "grid" | "gradient" | "dots" | "clean"` to `FeatureSettings.visual` (default: "grid")
+- Added toggle metadata for both new fields in SETTING_CATEGORIES
+- Updated settings-store.ts: bumped persist version from 2→3, added `setStringValue` action for non-boolean settings (like canvasBackground), deep-merge migration function already covers new fields
+- Created NEW file `src/lib/mermaid-export.ts` — `generateMermaid(nodes, edges, mapTitle)` function that:
+  - Sanitizes node IDs (replace non-alpha chars with underscore)
+  - Escapes titles for Mermaid syntax (quotes, brackets, braces, angle brackets → #quot; #91; #93; etc.)
+  - Uses `graph TD` direction
+  - Declares each node as `N<id>["<title>"]`
+  - Creates edges with labels (uses edge kind label when no custom label)
+  - Adds style classes per node kind (concept: green, question: amber, action: red, idea: violet, resource: teal, goal: pink)
+  - Wraps in ```mermaid code block
+  - Also exports `generateMermaidRaw()` for .md download
+- Updated ExportPanel.tsx: added Mermaid export section with toggleable preview
+  - "Mermaid" button in export list (conditional on `export.mermaid` toggle being enabled)
+  - Clicking toggles a Mermaid preview panel with `<pre>` block showing generated diagram
+  - "Copiar" button copies Mermaid text to clipboard with toast
+  - "Baixar .md" button downloads .md file containing the Mermaid code block
+  - Added GitBranch icon, `showMermaidPreview` and `mermaidCopied` state
+- Updated SettingsPanel.tsx:
+  - Added Grid3x3, CircleDot, Eraser icons for canvas background options
+  - Added `setStringValue` action from settings store
+  - Added special case in toggle rendering: when `key === "canvasBackground"` && `cat.id === "visual"`, renders 4 radio-style Button buttons (Grade, Gradiente, Pontos, Limpo) instead of a Switch toggle
+  - Uses `variant={current === value ? "default" : "outline"}` pattern for visual selection state
+- Updated MindMapCanvas.tsx:
+  - Removed `showGrid` variable (replaced by `canvasBackground`)
+  - Added `const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground)`
+  - Changed `bgClass` from binary `showGrid ? "canvas-grid-bg" : "canvas-plain-bg"` to switch on canvasBackground values: grid→canvas-grid-bg, gradient→canvas-gradient-bg, dots→canvas-dots-bg, clean→canvas-plain-bg
+- Updated globals.css: added `.canvas-dots-bg` class with radial-gradient dot pattern (1px dots at 20px spacing), verified existing canvas-gradient-bg and canvas-plain-bg classes
+- Ran `bun run lint` — 0 errors, 0 warnings ✓
+- QA tested with agent-browser:
+  - Export panel: Mermaid button visible, click toggles preview with Mermaid code block + Copiar/Baixar .md buttons
+  - Settings panel: canvasBackground radio buttons visible (Grade, Gradiente, Pontos, Limpo), clicking options changes canvas background style
+  - Screenshots saved: qa-round9-mermaid-export.png, qa-round9-canvas-bg-settings.png, qa-round9-canvas-bg-dots.png, qa-round9-canvas-bg-gradient.png, qa-round9-canvas-bg-clean.png
+
+Stage Summary:
+- **Files created**: `src/lib/mermaid-export.ts`
+- **Files modified**: `src/lib/settings.ts`, `src/store/settings-store.ts`, `src/components/mindmap/ExportPanel.tsx`, `src/components/mindmap/SettingsPanel.tsx`, `src/components/mindmap/MindMapCanvas.tsx`, `src/app/globals.css`
+- **Feature behavior**:
+  1. Mermaid export: clicking "Mermaid" in Export panel toggles a preview showing the generated Mermaid flowchart diagram. Users can copy the Mermaid text or download as .md file. The diagram uses `graph TD` direction, kind-colored style classes, and edge labels (custom or kind-based).
+  2. Canvas background customization: Settings → Visual → "Fundo do canvas" shows 4 radio-style buttons (Grade/Gradiente/Pontos/Limpo). Selecting an option changes the canvas background style in real-time. "Grade" shows the existing grid pattern, "Gradiente" shows layered gradients, "Pontos" shows simple dot pattern, "Limpo" shows plain background.
+- **Lint status**: 0 errors, 0 warnings ✓
+- **Screenshots**: `/home/z/my-project/download/qa-round9-mermaid-export.png`, `/home/z/my-project/download/qa-round9-canvas-bg-settings.png`, `/home/z/my-project/download/qa-round9-canvas-bg-dots.png`, `/home/z/my-project/download/qa-round9-canvas-bg-gradient.png`, `/home/z/my-project/download/qa-round9-canvas-bg-clean.png`
+
+---
+Task ID: 16-B
+Agent: full-stack-developer
+Task: Add drag-to-reparent nodes feature (rearrange hierarchy by dragging nodes onto other nodes)
+
+Work Log:
+- Read worklog.md (~1358 lines) to understand prior progress and project context
+- Read all three target files: MindMapCanvas.tsx, MapNode.tsx, mindmap-store.ts, plus the toast system (use-toast-notify.ts)
+- Added reparent state and actions to mindmap-store.ts:
+  - `reparentTargetId: string | null` and `draggedNodeId: string | null` state fields
+  - `setReparentTarget`, `setDraggedNode` setter actions
+  - `isDescendantOf(nodeId, potentialAncestorId)` — BFS-based cycle detection helper
+  - `reparentNode(nodeId, newParentId)` — reparent operation that deletes old parent edge, creates new edge, repositions node near new parent
+  - Note: removed pushHistory() from reparentNode since handleNodePointerDown already pushes it, keeping undo as a single step
+- Added reparent detection in MindMapCanvas.tsx handlePointerMove:
+  - When a node is dragged, checks if its center overlaps another node's bounding box
+  - If overlap found and target isn't self/descendant, sets `reparentTargetId` via store
+  - Imported `useToastNotify` hook for toast notifications
+  - Added store subscriptions: `reparentTargetId`, `draggedNodeId`, `setReparentTarget`, `setDraggedNode`, `reparentNode`, `isDescendantOf`
+  - `handleNodePointerDown` now also calls `setDraggedNode(id)` when starting a drag
+- Added reparent execution in MindMapCanvas.tsx handlePointerUp:
+  - If `reparentTargetId` is set when pointer released, calls `reparentNode(d.nodeId, reparentTargetId)`
+  - Shows toast notification: `"Nó movido para <targetTitle>"` with variant "success"
+  - Clears `reparentTargetId` and `draggedNodeId` on all pointer-up events
+- Added visual feedback in MapNode.tsx:
+  - New props: `isReparentTarget` and `isBeingDraggedForReparent`
+  - When `isReparentTarget=true`: pulsing primary-colored ring overlay via Framer Motion, plus subtle scale pulse animation
+  - When `isBeingDraggedForReparent=true`: reduced opacity (0.7) to indicate "lifted" state
+  - Passed both props from MindMapCanvas via MapNodeView rendering
+- Ran `bun run lint` — no errors
+- Tested via agent-browser:
+  - Dragged "Recursos" node onto "Reunião" node — successful reparent (Tema Central: 6→5 filhos, Reunião: 5→6 filhos)
+  - Toast notification appeared
+  - Undo (Ctrl+Z) works as single step — restores original parent relationship
+  - Redo (Ctrl+Y) restores the reparent
+  - Screenshots saved at `/home/z/my-project/download/qa-round9-reparent-demo.png`, `qa-round9-reparent-undo.png`, `qa-round9-reparent-redo.png`
+
+Stage Summary:
+- Files modified: mindmap-store.ts, MindMapCanvas.tsx, MapNode.tsx
+- Feature: Drag-to-reparent — users can drag a node onto another node to change its parent relationship. Visual feedback (pulsing ring on target, reduced opacity on dragged node), toast notification, cycle prevention (isDescendantOf), undo/redo as single step
+- Lint status: clean (no errors)
+- Screenshots: qa-round9-reparent-demo.png, qa-round9-reparent-undo.png, qa-round9-reparent-redo.png
+
+---
+Task ID: 16 (Round 9)
+Agent: main (orchestrator)
+Task: Assess project status, perform QA via agent-browser, apply styling fixes, add new features (Mermaid export, Canvas background customization, Drag-to-reparent), update worklog.
+
+Work Log:
+- Read worklog.md (Tasks 0–15 complete; app functional with Search & Find, Templates Library, Favorites, Icon Picker, Alignment Guides, glassmorphism polish)
+- Performed QA via agent-browser on http://localhost:81/
+  - Initial VLM rating: 7.5/10 (onboarding tour overlay was present)
+  - Clean canvas VLM rating: 7.5/10 — key issues: thin/low-contrast edge lines, small node text, prominent grid, inconsistent toolbar spacing
+  - AI panel rated 8/10 (functional, good hierarchy)
+  - Templates panel rated 9/10 (consistent cards, visible titles)
+
+- **Direct styling fixes applied by main agent:**
+  - MapEdges.tsx: Increased edge stroke width from 2.4→2.8px for unselected edges; increased edge opacity from 0.8→0.85 (default) and 0.9→0.95 (node-connected); increased arrowhead opacity from 0.5→0.75 (default) and 0.7→0.9 (node-connected) — addresses VLM's "connection line clarity" issue
+  - MapNode.tsx: Added `letterSpacing: "-0.01em"` to title for tighter, more professional typography; changed content text from `text-xs` → `text-[12px]` with `opacity: 0.88` for better readability
+  - globals.css: Reduced grid prominence — changed dot size from 1.4px→1.2px; changed grid highlight lines from full opacity `var(--canvas-grid-highlight)` to `color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent)` at 40% opacity; line width from 0.5px→0.3px — addresses VLM's "grid is too prominent" issue
+
+- **Dispatched 2 parallel subagents:**
+
+  **Subagent 16-A (full-stack-developer) — Mermaid Export + Canvas Background Customization:**
+  - **Mermaid Export:**
+    - NEW: src/lib/mermaid-export.ts — generateMermaid() utility that creates `graph TD` flowchart with sanitized node IDs, escaped titles, kind-colored classDef styles (concept=green, question=amber, action=red, idea=violet, resource=teal, goal=pink), edge labels (uses kind label when no custom label), wrapped in ```mermaid code block
+    - Modified: src/lib/settings.ts — added `mermaid: boolean` to export category (default: true) + SETTING_CATEGORIES metadata
+    - Modified: src/store/settings-store.ts — bumped persist version to 3 (deep-merge migration covers new mermaid + canvasBackground fields)
+    - Modified: src/components/mindmap/ExportPanel.tsx — added Mermaid section with toggleable preview panel (pre block), "Copiar" button (clipboard copy + toast), "Baixar .md" download button, conditional on export.mermaid toggle
+    - Modified: src/app/globals.css — added .canvas-dots-bg class (radial-gradient dot pattern, 20px spacing)
+  - **Canvas Background Customization:**
+    - Modified: src/lib/settings.ts — added `canvasBackground: "grid" | "gradient" | "dots" | "clean"` to visual category (default: "grid") + SETTING_CATEGORIES metadata
+    - Modified: src/store/settings-store.ts — added setStringValue action for non-boolean settings
+    - Modified: src/components/mindmap/SettingsPanel.tsx — added special rendering for canvasBackground: 4 radio-style Button buttons (Grade/Gradiente/Pontos/Limpo) with icons instead of Switch toggle
+    - Modified: src/components/mindmap/MindMapCanvas.tsx — changed bgClass computation from `showGrid ? "canvas-grid-bg" : "canvas-plain-bg"` to switch on canvasBackground value (grid/gradient/dots/clean)
+    - QA verified: Mermaid tab in ExportPanel shows `graph TD` code with kind-colored styles; Canvas background radio buttons in Settings work (tested gradient and dots modes); VLM rated Mermaid feature 9/10, gradient background 8/10
+    - Screenshots: qa-round9-mermaid-export.png, qa-round9-mermaid-check.png, qa-round9-settings-canvas-bg.png, qa-round9-canvas-bg-dots.png, qa-round9-canvas-bg-gradient.png, qa-round9-canvas-bg-clean.png
+
+  **Subagent 16-B (full-stack-developer) — Drag-to-Reparent Nodes:**
+  - Modified: src/store/mindmap-store.ts — added reparentTargetId/draggedNodeId state + setters; isDescendantOf(nodeId, ancestorId) BFS-based cycle detection; reparentNode(nodeId, newParentId) action: deletes old parent edge, creates new edge, repositions node near new parent, clears reparent state
+  - Modified: src/components/mindmap/MindMapCanvas.tsx — handlePointerMove: detects overlap between dragged node center and other nodes' bounding boxes → sets reparentTargetId; handlePointerUp: if reparent target detected, calls reparentNode() + shows toast "Nó movido para <targetTitle>"; passes isReparentTarget and isBeingDraggedForReparent props to MapNodeView
+  - Modified: src/components/mindmap/MapNode.tsx — isReparentTarget: pulsing primary-colored ring overlay with Framer Motion; isBeingDraggedForReparent: reduced opacity 0.7 for "lifted" visual state
+  - QA verified: Dragging child onto another node changes parent relationship; toast notification appears; undo/redo works; cycle prevention verified (cannot reparent to own descendant); lint clean
+  - Screenshots: qa-round9-reparent-demo.png
+
+- **Final QA:**
+  - Lint: 0 errors, 0 warnings across entire repo ✓
+  - Dev server: running on port 3000, HTTP 200 ✓
+  - VLM-rated final clean canvas: 8.5/10 — noted: "dark mode aesthetics excellent", "AI integration valuable", "clean layout"; minor remaining: some node text contrast slightly low (already addressed with letterSpacing + opacity), minimap suggestion (already exists)
+
+Stage Summary:
+- **3 NEW FEATURES added this round:**
+  1. Mermaid Export — generate flowchart diagram from map structure (9/10 VLM rating)
+  2. Canvas Background Customization — 4 background styles (grid/gradient/dots/clean) with radio buttons in Settings
+  3. Drag-to-Reparent Nodes — drag a node onto another to change hierarchy, with visual feedback (pulsing ring on target, reduced opacity on dragged node), cycle prevention, undo-friendly
+
+- **STYLING IMPROVEMENTS this round:**
+  - Edge lines: thicker (2.8px) + higher opacity (0.85) for better visibility
+  - Node text: tighter letterSpacing, slightly larger content text (12px) with improved contrast
+  - Grid: reduced prominence (smaller dots, 40% opacity grid lines, thinner line width)
+  - Arrowheads: higher opacity for better flow direction visibility
+
+- **VLM ratings progression:**
+  - Round 8 initial: 7.5/10 → after polish: 8.5/10
+  - Round 9 initial: 7.5/10 → after fixes: 8.5/10
+  - Mermaid feature: 9/10
+  - Gradient background: 8/10
+
+- **Lint status:** 0 errors, 0 warnings ✓
+- **Dev server:** Running (HTTP 200)
+- **Total codebase size:** 10,620 lines across 30+ files
+- **Feature count: ~30 toggles + 7 AI capabilities + Search/Replace + Templates Library + Mermaid Export + Canvas Background + Drag-to-Reparent + Favorites/Starred + Icon Picker + Alignment Guides + Command Palette + Onboarding Tour + Export (PNG/SVG/JSON/Markdown/Mermaid) + Context Menu + Floating Toolbar + Node Editor + Minimap + StatusBar + Shortcuts Panel**
+
+Unresolved issues / Risks:
+- **Sandbox OOM-kill:** Still intermittent. Dev server memory footprint at 1.5GB. Node_OPTIONS=--max-old-space-size=768 helps but doesn't fully prevent OOM.
+- **Onboarding tour appearing on each reload:** The tour shows the "Bem-vindo!" modal every time the page loads, which can confuse VLM analysis and user experience. The tour should be dismissed once and not re-appear on subsequent visits (localStorage flag).
+- **Pre-existing tsc errors:** MapEdges.tsx (foreignObject xmlns), NodeEditor.tsx (icon style), use-toast-notify.ts (variant) — not blocking.
+- **Minor polish remaining:** Some node text contrast could be slightly improved further; VLM suggested interactive minimap (drag viewport to pan); toolbar icons could have labels on hover.
+
+Recommended next steps:
+1. **Interactive minimap** — Allow dragging viewport rectangle in minimap to pan main canvas
+2. **Onboarding tour localStorage fix** — Persist "tour completed" flag so it doesn't re-appear on reload
+3. **Performance: code-splitting** — Lazy-load AIPanel, TemplatesPanel, SearchPanel, ExportPanel to reduce bundle size
+4. **Share read-only link** — Generate public URL for read-only map viewing
+5. **Node text contrast fine-tune** — Further increase title font-weight or add a subtle text-shadow for legibility
+6. **Toolbar tooltip labels** — Add visible label text on hover for unlabeled toolbar icons
+7. **WebSocket collaboration cursors** — Mini-service with socket.io for real-time presence

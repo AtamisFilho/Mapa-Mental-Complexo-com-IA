@@ -37,6 +37,10 @@ interface MindMapState {
   past: HistoryEntry[];
   future: HistoryEntry[];
 
+  // reparent (Task 16-B)
+  reparentTargetId: string | null;
+  draggedNodeId: string | null;
+
   // search (Task 15-B)
   searchQuery: string;
   searchMatches: string[]; // nodeIds that match the current query
@@ -85,6 +89,12 @@ interface MindMapState {
   undo: () => void;
   redo: () => void;
 
+  // reparent actions (Task 16-B)
+  setReparentTarget: (id: string | null) => void;
+  setDraggedNode: (id: string | null) => void;
+  reparentNode: (nodeId: string, newParentId: string) => boolean;
+  isDescendantOf: (nodeId: string, potentialAncestorId: string) => boolean;
+
   // search actions (Task 15-B)
   setSearchQuery: (q: string) => void;
   setSearchMatches: (ids: string[]) => void;
@@ -129,6 +139,10 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
 
   past: [],
   future: [],
+
+  // reparent (Task 16-B)
+  reparentTargetId: null,
+  draggedNodeId: null,
 
   // search (Task 15-B)
   searchQuery: "",
@@ -599,6 +613,88 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
         dirty: true,
       };
     }),
+
+  // ── Reparent (Task 16-B) ──────────────────────────────────────────────
+  setReparentTarget: (id) => set({ reparentTargetId: id }),
+  setDraggedNode: (id) => set({ draggedNodeId: id }),
+
+  isDescendantOf: (nodeId, potentialAncestorId) => {
+    // Check if `nodeId` is a descendant of `potentialAncestorId` by traversing
+    // edges downward. Returns true if the node is in the subtree of the ancestor,
+    // which would create a cycle if we reparented the ancestor under the node.
+    const { edges } = get();
+    // Build children map (source → targets)
+    const childrenOf = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // BFS from potentialAncestorId
+    const visited = new Set<string>();
+    const queue = [potentialAncestorId];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      if (cur === nodeId) return true; // nodeId is a descendant
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!visited.has(child)) queue.push(child);
+      }
+    }
+    return false;
+  },
+
+  reparentNode: (nodeId, newParentId) => {
+    // Cannot reparent to self
+    if (nodeId === newParentId) return false;
+    // Cannot reparent to own descendant (would create cycle)
+    if (get().isDescendantOf(newParentId, nodeId)) return false;
+
+    // Note: pushHistory() is NOT called here because the caller
+    // (handleNodePointerDown in MindMapCanvas) already pushes history
+    // before the drag starts, which captures the initial state.
+    // The reparent + position changes should be undoable as a single step.
+
+    // Find the old parent edge (where targetId === nodeId)
+    const oldEdge = get().edges.find((e) => e.targetId === nodeId);
+    const oldEdgeKind = oldEdge?.kind ?? "related";
+
+    // Delete old parent edge if exists
+    if (oldEdge) {
+      get().deleteEdge(oldEdge.id);
+    }
+
+    // Create new edge from newParentId to nodeId
+    get().addEdge(newParentId, nodeId, oldEdgeKind as EdgeKind);
+
+    // Optionally reposition node near its new parent (+200px right, +60px below)
+    const newParent = get().nodes.find((n) => n.id === newParentId);
+    if (newParent) {
+      const draggedNode = get().nodes.find((n) => n.id === nodeId);
+      if (draggedNode) {
+        // Check if there are already children of the new parent at that position
+        // and offset further to avoid overlap
+        const childrenOfNewParent = get().edges
+          .filter((e) => e.sourceId === newParentId && e.targetId !== nodeId)
+          .map((e) => get().nodes.find((n) => n.id === e.targetId));
+        // Calculate y offset — stack below existing children
+        let yOffset = 60;
+        for (const child of childrenOfNewParent) {
+          if (child) {
+            yOffset = Math.max(yOffset, child.y - newParent.y + child.height + 60);
+          }
+        }
+        get().updateNode(nodeId, {
+          x: newParent.x + newParent.width + 200,
+          y: newParent.y + yOffset,
+        });
+      }
+    }
+
+    // Clear reparent state
+    set({ reparentTargetId: null, draggedNodeId: null });
+    return true;
+  },
 
   // ── Search & Replace (Task 15-B) ─────────────────────────────────────
   setSearchQuery: (q) => set({ searchQuery: q }),

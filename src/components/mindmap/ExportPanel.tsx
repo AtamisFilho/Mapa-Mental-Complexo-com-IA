@@ -11,12 +11,14 @@ import {
   Copy,
   Check,
   Upload,
+  GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { NODE_KIND_META } from "@/lib/settings";
+import { generateMermaid } from "@/lib/mermaid-export";
 
 interface Props {
   open: boolean;
@@ -55,9 +57,11 @@ function validateImportJSON(data: unknown): { valid: boolean; error?: string } {
 }
 
 export function ExportPanel({ open, onClose }: Props) {
-  const [exporting, setExporting] = useState<null | "json" | "md" | "png" | "svg" | "copy" | "import">(null);
+  const [exporting, setExporting] = useState<null | "json" | "md" | "png" | "svg" | "copy" | "import" | "mermaid" | "mermaidMd">(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showMermaidPreview, setShowMermaidPreview] = useState(false);
+  const [mermaidCopied, setMermaidCopied] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +74,7 @@ export function ExportPanel({ open, onClose }: Props) {
   const jsonEnabled = useSettingsStore((s) => s.settings.export.json);
   const mdEnabled = useSettingsStore((s) => s.settings.export.markdown);
   const pngEnabled = useSettingsStore((s) => s.settings.export.png);
+  const mermaidEnabled = useSettingsStore((s) => s.settings.export.mermaid);
   const includeNotes = useSettingsStore((s) => s.settings.export.includeNotes);
 
   const downloadBlob = useCallback((blob: Blob, filename: string) => {
@@ -576,6 +581,77 @@ export function ExportPanel({ open, onClose }: Props) {
                   <p className="text-xs text-muted-foreground">Lista hierárquica {includeNotes ? "com notas" : ""}</p>
                 </div>
               </button>
+            )}
+
+            {/* Mermaid Export */}
+            {mermaidEnabled && (
+              <div className="flex flex-col gap-2">
+                <button
+                  className="group flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-accent/40 transition-all text-left"
+                  disabled={exporting !== null}
+                  onClick={() => setShowMermaidPreview((prev) => !prev)}
+                >
+                  <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    {exporting === "mermaid" || exporting === "mermaidMd" ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitBranch className="h-4 w-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Mermaid</p>
+                    <p className="text-xs text-muted-foreground">Diagrama para GitHub, Notion, etc.</p>
+                  </div>
+                </button>
+
+                {showMermaidPreview && (() => {
+                  const mermaidCode = generateMermaid(nodes, edges, title);
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <pre className="bg-muted/50 p-3 rounded-md text-xs font-mono max-h-96 overflow-y-auto border border-border/50 whitespace-pre-wrap break-words">
+                        {mermaidCode}
+                      </pre>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          disabled={exporting !== null}
+                          onClick={async () => {
+                            setExporting("mermaid");
+                            try {
+                              await navigator.clipboard.writeText(mermaidCode);
+                              setMermaidCopied(true);
+                              setMessage("✅ Mermaid copiado para a área de transferência!");
+                              setTimeout(() => setMermaidCopied(false), 2000);
+                            } catch {
+                              setMessage("Não foi possível copiar.");
+                            }
+                            setExporting(null);
+                          }}
+                        >
+                          {mermaidCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          Copiar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          disabled={exporting !== null}
+                          onClick={() => {
+                            setExporting("mermaidMd");
+                            downloadBlob(
+                              new Blob([mermaidCode], { type: "text/markdown" }),
+                              safeName("md")
+                            );
+                            setMessage("✅ Mermaid .md baixado com sucesso!");
+                            setExporting(null);
+                          }}
+                        >
+                          <Download className="h-3 w-3" />
+                          Baixar .md
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             )}
 
             <button

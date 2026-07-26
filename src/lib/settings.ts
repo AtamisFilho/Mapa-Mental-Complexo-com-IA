@@ -18,13 +18,14 @@ export interface FeatureSettings {
   // ── Visual ──────────────────────────────────────────
   visual: {
     animations: boolean; // framer-motion transitions
-    grid: boolean; // background dot grid
+    grid: boolean; // background dot grid (deprecated — use canvasBackground)
     minimap: boolean; // minimap in corner
     edgeLabels: boolean; // show edge labels
     autoColors: boolean; // auto-color nodes by kind
     glow: boolean; // glow effect on selected node
     rounded: boolean; // rounded node corners
     showStatusBar: boolean; // bottom status bar
+    canvasBackground: "grid" | "gradient" | "dots" | "clean"; // background style
   };
   // ── Editor ──────────────────────────────────────────
   editor: {
@@ -51,6 +52,7 @@ export interface FeatureSettings {
     png: boolean;
     json: boolean;
     markdown: boolean;
+    mermaid: boolean; // export as Mermaid diagram
     includeNotes: boolean; // include node notes in markdown export
   };
   // ── Theme ───────────────────────────────────────────
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: FeatureSettings = {
     glow: true,
     rounded: true,
     showStatusBar: true,
+    canvasBackground: "grid",
   },
   editor: {
     autosave: true,
@@ -104,6 +107,7 @@ export const DEFAULT_SETTINGS: FeatureSettings = {
     png: true,
     json: true,
     markdown: true,
+    mermaid: true,
     includeNotes: true,
   },
   theme: {
@@ -153,6 +157,7 @@ export const SETTING_CATEGORIES: SettingCategoryMeta[] = [
     toggles: [
       { key: "animations", label: "Animações", description: "Transições suaves com Framer Motion." },
       { key: "grid", label: "Grade de fundo", description: "Mostra pontos de grade no canvas." },
+      { key: "canvasBackground", label: "Fundo do canvas", description: "Estilo do fundo: grade, gradiente, pontos, limpo." },
       { key: "minimap", label: "Minimapa", description: "Visão geral no canto." },
       { key: "edgeLabels", label: "Rótulos das arestas", description: "Exibe o tipo/label das conexões." },
       { key: "autoColors", label: "Cores automáticas", description: "Coloração automática por tipo de nó." },
@@ -196,6 +201,7 @@ export const SETTING_CATEGORIES: SettingCategoryMeta[] = [
       { key: "png", label: "Exportar PNG", description: "Imagem do mapa." },
       { key: "json", label: "Exportar JSON", description: "Dados brutos do mapa." },
       { key: "markdown", label: "Exportar Markdown", description: "Lista hierárquica em MD." },
+      { key: "mermaid", label: "Exportar Mermaid", description: "Diagrama Mermaid para visualizar em GitHub, Notion, etc." },
       { key: "includeNotes", label: "Incluir notas (MD)", description: "Inclui notas dos nós no Markdown." },
     ],
   },

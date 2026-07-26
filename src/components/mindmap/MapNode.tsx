@@ -36,6 +36,8 @@ interface Props {
   onConnectHandle: (e: React.PointerEvent, id: string) => void;
   onContextMenu?: (e: React.MouseEvent, id: string) => void;
   isHighlighted?: boolean;
+  isReparentTarget?: boolean; // Task 16-B: highlight when node is reparent drop target
+  isBeingDraggedForReparent?: boolean; // Task 16-B: reduced opacity while being dragged for reparent
 }
 
 /** Hook to track if a node was created within the last 3 seconds */
@@ -54,7 +56,7 @@ function useIsFresh(createdAt: string) {
   return isFresh;
 }
 
-function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted }: Props) {
+function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted, isReparentTarget, isBeingDraggedForReparent }: Props) {
   const selected = useMindMapStore((s) => s.selectedNodeIds.includes(node.id));
   const hovered = useMindMapStore((s) => s.hoveredNodeId === node.id);
   const selectNode = useMindMapStore((s) => s.selectNode);
@@ -122,8 +124,8 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           : false
       }
       animate={{
-        opacity: 1,
-        scale: 1,
+        opacity: isBeingDraggedForReparent ? 0.7 : 1,
+        scale: isReparentTarget ? [1, 1.04, 1] : 1,
         filter: isFresh ? ["brightness(1.6)", "brightness(1.1)", "brightness(1)"] : "brightness(1)",
       }}
       exit={animations ? { opacity: 0, scale: 0.85 } : undefined}
@@ -220,6 +222,32 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           />
         )}
 
+        {/* Reparent target ring overlay (Task 16-B) — primary-colored pulsing ring */}
+        {isReparentTarget && (
+          <motion.div
+            aria-hidden
+            animate={{
+              boxShadow: [
+                "0 0 0 2px var(--primary), 0 0 8px 2px rgba(var(--primary-rgb), 0.35)",
+                "0 0 0 4px var(--primary), 0 0 16px 4px rgba(var(--primary-rgb), 0.5)",
+                "0 0 0 2px var(--primary), 0 0 8px 2px rgba(var(--primary-rgb), 0.35)",
+              ],
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: 1.2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            style={{
+              position: "absolute",
+              inset: -4,
+              borderRadius: `calc(${radius} + 4px)`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
         {/* #5: Accent stripe — 6px wide with gradient from solid top to fading bottom */}
         <div
           aria-hidden
@@ -297,7 +325,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           <div className="min-w-0 flex-1">
             <p
               className="text-[14px] font-bold leading-snug break-words tracking-tight"
-              style={{ color: "var(--foreground)" }}
+              style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}
             >
               {node.title}
             </p>
@@ -324,7 +352,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           )}
         </div>
         {!node.collapsed && node.content && (
-          <p className="pl-1.5 text-xs leading-relaxed text-muted-foreground/90 line-clamp-3 break-words">
+          <p className="pl-1.5 text-[12px] leading-relaxed text-muted-foreground line-clamp-3 break-words" style={{ opacity: 0.88 }}>
             {node.content}
           </p>
         )}

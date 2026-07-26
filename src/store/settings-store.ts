@@ -18,6 +18,11 @@ interface SettingsState {
     key: string,
     value: number
   ) => void;
+  setStringValue: (
+    category: keyof FeatureSettings,
+    key: string,
+    value: string
+  ) => void;
   resetAll: () => void;
   resetCategory: (category: keyof FeatureSettings) => void;
   isFeatureEnabled: (
@@ -69,6 +74,17 @@ export const useSettingsStore = create<SettingsState>()(
           },
         })),
 
+      setStringValue: (category, key, value) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            [category]: {
+              ...(state.settings[category] as object),
+              [key]: value,
+            },
+          },
+        })),
+
       resetAll: () => set({ settings: DEFAULT_SETTINGS }),
 
       resetCategory: (category) =>
@@ -91,7 +107,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "mindmap-settings",
-      version: 2,
+      version: 3,
       // Deep-merge persisted settings with DEFAULT_SETTINGS so that newly-added
       // fields (e.g. `editor.alignmentGuides`) get their default value for
       // users who already have an older persisted state.

@@ -14,6 +14,9 @@ import {
   Monitor,
   Check,
   MapPin,
+  Grid3x3,
+  CircleDot,
+  Eraser,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -42,6 +45,7 @@ export function SettingsPanel({ open, onClose, onReplayTour }: Props) {
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
   const setAccent = useSettingsStore((s) => s.setAccent);
   const setNumberValue = useSettingsStore((s) => s.setNumberValue);
+  const setStringValue = useSettingsStore((s) => s.setStringValue);
   const resetCategory = useSettingsStore((s) => s.resetCategory);
   const resetAll = useSettingsStore((s) => s.resetAll);
 
@@ -160,6 +164,40 @@ export function SettingsPanel({ open, onClose, onReplayTour }: Props) {
                 <div className={`flex flex-col gap-1 ${isAIDisabled ? "opacity-40 pointer-events-none" : ""}`}>
                   {cat.toggles.map((toggle) => {
                     const value = catSettings[toggle.key];
+
+                    // Special case: canvasBackground is a string selector, not a boolean toggle
+                    if (toggle.key === "canvasBackground" && cat.id === "visual") {
+                      const currentBg = (value as string) || "grid";
+                      const bgOptions = [
+                        { value: "grid", icon: <Grid3x3 className="h-3 w-3" />, label: "Grade" },
+                        { value: "gradient", icon: <Palette className="h-3 w-3" />, label: "Gradiente" },
+                        { value: "dots", icon: <CircleDot className="h-3 w-3" />, label: "Pontos" },
+                        { value: "clean", icon: <Eraser className="h-3 w-3" />, label: "Limpo" },
+                      ];
+                      return (
+                        <div key={toggle.key} className="flex items-center justify-between py-1.5 px-2.5 rounded-md hover:bg-accent/40 transition-colors group">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <p className="text-xs font-medium">{toggle.label}</p>
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{toggle.description}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            {bgOptions.map((opt) => (
+                              <Button
+                                key={opt.value}
+                                variant={currentBg === opt.value ? "default" : "outline"}
+                                size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-0.5"
+                                onClick={() => setStringValue("visual", "canvasBackground", opt.value)}
+                              >
+                                {opt.icon}
+                                {opt.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     if (typeof value !== "boolean") return null;
                     const isMasterSwitch = cat.id === "ai" && toggle.key === "enabled";
 
