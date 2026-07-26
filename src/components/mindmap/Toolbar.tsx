@@ -19,6 +19,8 @@ import {
   Keyboard,
   Download,
   Search,
+  Edit3,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -34,9 +36,10 @@ interface Props {
   onOpenShortcuts: () => void;
   onOpenExport: () => void;
   onOpenSearch: () => void;
+  onOpenNodeEditor: () => void;
 }
 
-export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch }: Props) {
+export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const { tool, setTool } = useTool();
@@ -49,6 +52,8 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const future = useMindMapStore((s) => s.future);
   const addNode = useMindMapStore((s) => s.addNode);
   const deleteNode = useMindMapStore((s) => s.deleteNode);
+  const duplicateNode = useMindMapStore((s) => s.duplicateNode);
+  const pushHistory = useMindMapStore((s) => s.pushHistory);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
   const viewport = useMindMapStore((s) => s.viewport);
 
@@ -62,9 +67,9 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       const cx = typeof window !== "undefined" ? window.innerWidth / 2 : 600;
       const cy = typeof window !== "undefined" ? window.innerHeight / 2 : 400;
       const vp = viewport;
-      const wx = (cx - vp.x) / vp.zoom - 100;
-      const wy = (cy - vp.y) / vp.zoom - 40;
-      addNode({ title: "Novo " + meta.label, kind, x: wx, y: wy, width: 200, height: 80 });
+      const wx = (cx - vp.x) / vp.zoom - 110;
+      const wy = (cy - vp.y) / vp.zoom - 44;
+      addNode({ title: "Novo " + meta.label, kind, x: wx, y: wy, width: 220, height: 88 });
       setAddMenuOpen(false);
     },
     [addNode, viewport]
@@ -75,6 +80,12 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       deleteNode(id);
     }
   }, [selectedNodeIds, deleteNode]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (selectedNodeIds.length === 0) return;
+    pushHistory();
+    duplicateNode(selectedNodeIds[0]);
+  }, [selectedNodeIds, duplicateNode, pushHistory]);
 
   // Close add-menu on outside click / Escape
   useEffect(() => {
@@ -182,9 +193,17 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
 
       {/* Delete */}
       {selectedNodeIds.length > 0 && (
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors" onClick={handleDeleteSelected} title="Excluir selecionados">
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors" onClick={handleDeleteSelected} title="Excluir selecionados (Del)">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={handleDuplicateSelected} title="Duplicar selecionado (Ctrl+D)">
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenNodeEditor} title="Editar nó (duplo-clique)">
+            <Edit3 className="h-4 w-4" />
+          </Button>
+        </>
       )}
 
       {/* Zoom */}

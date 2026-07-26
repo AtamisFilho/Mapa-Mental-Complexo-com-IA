@@ -55,6 +55,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle }: Props) {
   return (
     <motion.div
       layout={animations}
+      data-node-id={node.id}
       initial={animations ? { opacity: 0, scale: 0.85 } : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={animations ? { opacity: 0, scale: 0.85 } : undefined}

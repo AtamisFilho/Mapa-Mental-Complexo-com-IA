@@ -128,6 +128,7 @@ export default function Home() {
           onOpenShortcuts={handleOpenShortcuts}
           onOpenExport={handleOpenExport}
           onOpenSearch={() => setCommandPaletteOpen(true)}
+          onOpenNodeEditor={handleOpenNodeEditor}
         />
 
         {/* Main content area */}
@@ -170,6 +171,7 @@ export default function Home() {
           open={commandPaletteOpen}
           onClose={() => setCommandPaletteOpen(false)}
           onOpenAIPanel={handleOpenAIPanel}
+          onOpenNodeEditor={handleOpenNodeEditor}
         />
 
         {/* Footer */}

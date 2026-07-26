@@ -19,9 +19,10 @@ interface Props {
 export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragType, setDragType] = useState<"node" | "pan" | null>(null);
+  const [dragType, setDragType] = useState<"node" | "pan" | "box" | null>(null);
+  const [boxSel, setBoxSel] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const dragRef = useRef<{
-    type: "node" | "pan";
+    type: "node" | "pan" | "box";
     nodeId?: string;
     startX: number;
     startY: number;
@@ -46,6 +47,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const pushHistory = useMindMapStore((s) => s.pushHistory);
   const focusNode = useMindMapStore((s) => s.focusNode);
   const deleteNode = useMindMapStore((s) => s.deleteNode);
+  const duplicateNode = useMindMapStore((s) => s.duplicateNode);
+  const selectNodes = useMindMapStore((s) => s.selectNode);
+  const multiSelect = useSettingsStore((s) => s.settings.editor.multiSelect);
 
   const showGrid = useSettingsStore((s) => s.settings.visual.grid);
   const snapToGrid = useSettingsStore((s) => s.settings.editor.snapToGrid);
@@ -98,11 +102,28 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
         return;
       }
+      // Select tool + empty canvas click → start box selection
+      if (tool === "select" && multiSelect) {
+        dragRef.current = {
+          type: "box",
+          startX: e.clientX,
+          startY: e.clientY,
+          vpStartX: 0,
+          vpStartY: 0,
+          nodeStartX: 0,
+          nodeStartY: 0,
+        };
+        setIsDragging(true);
+        setDragType("box");
+        setBoxSel({ startX: e.clientX, startY: e.clientY, endX: e.clientX, endY: e.clientY });
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        return;
+      }
       clearSelection();
       setConnectingFrom(null);
       setCursorWorld(null);
     },
-    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld]
+    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld, multiSelect]
   );
 
   // Node pointer down — start drag or connect
@@ -164,6 +185,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       if (d.type === "pan") {
         panBy(dx, dy);
         dragRef.current = { ...d, startX: e.clientX, startY: e.clientY };
+      } else if (d.type === "box") {
+        setBoxSel({ startX: d.startX, startY: d.startY, endX: e.clientX, endY: e.clientY });
       } else if (d.type === "node" && d.nodeId) {
         const worldDx = dx / viewport.zoom;
         const worldDy = dy / viewport.zoom;
@@ -177,10 +200,42 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
 
   // Pointer up
   const handlePointerUp = useCallback(() => {
+    const d = dragRef.current;
+    if (d?.type === "box" && boxSel) {
+      // Convert box to world coords, then select nodes within
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const x1 = Math.min(boxSel.startX, boxSel.endX) - rect.left;
+        const y1 = Math.min(boxSel.startY, boxSel.endY) - rect.top;
+        const x2 = Math.max(boxSel.startX, boxSel.endX) - rect.left;
+        const y2 = Math.max(boxSel.startY, boxSel.endY) - rect.top;
+        // World-space rect
+        const wx1 = (x1 - viewport.x) / viewport.zoom;
+        const wy1 = (y1 - viewport.y) / viewport.zoom;
+        const wx2 = (x2 - viewport.x) / viewport.zoom;
+        const wy2 = (y2 - viewport.y) / viewport.zoom;
+        const hits = nodes.filter(
+          (n) => n.x + n.width >= wx1 && n.x <= wx2 && n.y + n.height >= wy1 && n.y <= wy2
+        );
+        // Box-select only when meaningful drag (>=4px), else treat as click → clear
+        const movedEnough = Math.abs(boxSel.endX - boxSel.startX) > 4 || Math.abs(boxSel.endY - boxSel.startY) > 4;
+        if (movedEnough) {
+          if (hits.length > 0) {
+            // Replace selection with hits
+            useMindMapStore.setState({ selectedNodeIds: hits.map((n) => n.id), selectedEdgeIds: [] });
+          } else {
+            clearSelection();
+          }
+        } else {
+          clearSelection();
+        }
+      }
+      setBoxSel(null);
+    }
     dragRef.current = null;
     setIsDragging(false);
     setDragType(null);
-  }, []);
+  }, [boxSel, viewport, nodes, clearSelection]);
 
   // Wheel zoom
   const handleWheel = useCallback(
@@ -196,23 +251,35 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     [zoomBy]
   );
 
-  // Double click — add node
+  // Double click on canvas — add node. Double click on node → open editor.
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target !== containerRef.current && !(e.target as HTMLElement).dataset?.canvas) return;
+      const target = e.target as HTMLElement;
+      const isCanvasBg = target === containerRef.current || !!target.dataset?.canvas;
+      if (!isCanvasBg) {
+        // Was a node double-click? Look for data-node-id
+        const nodeEl = target.closest("[data-node-id]") as HTMLElement | null;
+        if (nodeEl?.dataset.nodeId) {
+          // Select and open editor
+          selectNodes(nodeEl.dataset.nodeId, false);
+          onOpenNodeEditor();
+          return;
+        }
+        return;
+      }
       const world = screenToWorld(e.clientX, e.clientY);
       const id = addNode({
         title: "Novo conceito",
         x: snap(world.x - 100),
         y: snap(world.y - 40),
         kind: "concept",
-        width: 200,
-        height: 80,
+        width: 220,
+        height: 88,
       });
       focusNode(id);
       onOpenNodeEditor();
     },
-    [screenToWorld, addNode, snap, focusNode, onOpenNodeEditor]
+    [screenToWorld, addNode, snap, focusNode, onOpenNodeEditor, selectNodes]
   );
 
   // Keyboard shortcuts
@@ -221,6 +288,16 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       // Skip if user is typing in an input/textarea/contenteditable
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      // Duplicate node: Ctrl/Cmd+D
+      if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
+        if (selectedNodeIds.length > 0) {
+          e.preventDefault();
+          pushHistory();
+          // Duplicate the first selected node
+          duplicateNode(selectedNodeIds[0]);
+        }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
@@ -264,14 +341,23 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         e.preventDefault();
         const cx = window.innerWidth / 2;
         const cy = window.innerHeight / 2;
-        const wx = (cx - viewport.x) / viewport.zoom - 100;
-        const wy = (cy - viewport.y) / viewport.zoom - 40;
-        addNode({ title: "Novo " + NODE_KIND_META[keyMap[k]].label, kind: keyMap[k], x: wx, y: wy, width: 200, height: 80 });
+        const wx = (cx - viewport.x) / viewport.zoom - 110;
+        const wy = (cy - viewport.y) / viewport.zoom - 44;
+        addNode({ title: "Novo " + NODE_KIND_META[keyMap[k]].label, kind: keyMap[k], x: wx, y: wy, width: 220, height: 88 });
+        return;
+      }
+      // E or Enter — open Node Editor for the selected node
+      if (k === "e" || e.key === "Enter") {
+        if (selectedNodeIds.length > 0) {
+          e.preventDefault();
+          onOpenNodeEditor();
+        }
+        return;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor]);
 
   const bgClass = showGrid ? "canvas-grid-bg" : "canvas-plain-bg";
 
@@ -362,20 +448,25 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       {nodes.length === 0 && !isDragging && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center max-w-md px-6">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center relative">
               <Sparkles className="h-8 w-8 text-primary" />
+              <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-ping opacity-30" />
             </div>
             <p className="text-lg font-semibold brand-gradient mb-1">Comece seu mapa mental</p>
             <p className="text-sm text-muted-foreground mb-3">
               Clique duplo no canvas para adicionar um nó, ou use o botão <strong className="text-foreground">Adicionar</strong> na barra.
             </p>
-            <div className="flex flex-wrap gap-1.5 justify-center text-[10px] text-muted-foreground">
-              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">C</kbd> Conceito
-              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta
-              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação
-              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia
-              <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar
+            <div className="flex flex-wrap gap-1.5 justify-center text-[10px] text-muted-foreground mb-3">
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">C</kbd> Conceito</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> Buscar</span>
             </div>
+            <p className="text-[11px] text-muted-foreground/70 italic">
+              Dica: explore os <strong className="text-foreground/80">templates</strong> no painel Mapas (botão no canto esquerdo).
+            </p>
           </div>
         </div>
       )}
@@ -392,6 +483,29 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
             Clique em outro nó para completar a conexão · Esc para cancelar
+          </div>
+        </div>
+      )}
+
+      {/* Box-selection visual */}
+      {boxSel && (
+        <div
+          className="absolute pointer-events-none border-2 border-primary/60 bg-primary/15 rounded-sm z-40"
+          style={{
+            left: Math.min(boxSel.startX, boxSel.endX),
+            top: Math.min(boxSel.startY, boxSel.endY),
+            width: Math.abs(boxSel.endX - boxSel.startX),
+            height: Math.abs(boxSel.endY - boxSel.startY),
+          }}
+        />
+      )}
+
+      {/* Selection info badge when multiple nodes selected */}
+      {selectedNodeIds.length > 1 && !isDragging && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="bg-card/95 border border-border text-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            {selectedNodeIds.length} nós selecionados · <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Del</kbd> excluir · <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Ctrl+D</kbd> duplicar 1º
           </div>
         </div>
       )}

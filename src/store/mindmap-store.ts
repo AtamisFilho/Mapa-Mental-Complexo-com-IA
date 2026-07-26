@@ -42,6 +42,7 @@ interface MindMapState {
   addNode: (partial: Partial<MapNode> & { title: string }) => string;
   updateNode: (id: string, patch: Partial<MapNode>) => void;
   deleteNode: (id: string) => void;
+  duplicateNode: (id: string) => string | null;
   addEdge: (sourceId: string, targetId: string, kind?: EdgeKind, label?: string) => void;
   updateEdge: (id: string, patch: Partial<MapEdge>) => void;
   deleteEdge: (id: string) => void;
@@ -155,6 +156,28 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       selectedNodeIds: s.selectedNodeIds.filter((sid) => sid !== id),
       dirty: true,
     })),
+
+  duplicateNode: (id) => {
+    const src = get().nodes.find((n) => n.id === id);
+    if (!src) return null;
+    const newId = uid("n");
+    const copy: MapNode = {
+      ...src,
+      id: newId,
+      x: src.x + 32,
+      y: src.y + 32,
+      title: `${src.title} (cópia)`,
+      collapsed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    set((s) => ({
+      nodes: [...s.nodes, copy],
+      selectedNodeIds: [newId],
+      dirty: true,
+    }));
+    return newId;
+  },
 
   addEdge: (sourceId, targetId, kind = "related", label) => {
     // avoid duplicates / self-loops

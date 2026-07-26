@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Sparkles,
   X,
+  Edit3,
 } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
@@ -18,6 +19,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onOpenAIPanel: () => void;
+  onOpenNodeEditor: () => void;
 }
 
 interface CommandItem {
@@ -30,7 +32,7 @@ interface CommandItem {
   group: string;
 }
 
-export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
+export function CommandPalette({ open, onClose, onOpenAIPanel, onOpenNodeEditor }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +85,7 @@ export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
         action: () => {
           const cx = window.innerWidth / 2;
           const cy = window.innerHeight / 2;
-          addNode({ title: "Novo Conceito", kind: "concept", x: (cx - viewport.x) / viewport.zoom - 90, y: (cy - viewport.y) / viewport.zoom - 36 });
+          addNode({ title: "Novo Conceito", kind: "concept", x: (cx - viewport.x) / viewport.zoom - 110, y: (cy - viewport.y) / viewport.zoom - 44, width: 220, height: 88 });
           close();
         },
       },
@@ -97,7 +99,7 @@ export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
         action: () => {
           const cx = window.innerWidth / 2;
           const cy = window.innerHeight / 2;
-          addNode({ title: "Nova Pergunta", kind: "question", x: (cx - viewport.x) / viewport.zoom - 90, y: (cy - viewport.y) / viewport.zoom - 36 });
+          addNode({ title: "Nova Pergunta", kind: "question", x: (cx - viewport.x) / viewport.zoom - 110, y: (cy - viewport.y) / viewport.zoom - 44, width: 220, height: 88 });
           close();
         },
       },
@@ -111,7 +113,7 @@ export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
         action: () => {
           const cx = window.innerWidth / 2;
           const cy = window.innerHeight / 2;
-          addNode({ title: "Nova Ideia", kind: "idea", x: (cx - viewport.x) / viewport.zoom - 90, y: (cy - viewport.y) / viewport.zoom - 36 });
+          addNode({ title: "Nova Ideia", kind: "idea", x: (cx - viewport.x) / viewport.zoom - 110, y: (cy - viewport.y) / viewport.zoom - 44, width: 220, height: 88 });
           close();
         },
       },
@@ -126,6 +128,23 @@ export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
         group: "Ações",
         action: () => { onOpenAIPanel(); close(); },
       });
+    }
+
+    // Edit selected node action (only when there is a selection)
+    const selectedId = useMindMapStore.getState().selectedNodeIds[0];
+    if (selectedId) {
+      const sel = nodes.find((n) => n.id === selectedId);
+      if (sel) {
+        actions.unshift({
+          id: "action-edit-selected",
+          label: `Editar nó: ${sel.title}`,
+          hint: "E",
+          icon: <Edit3 className="h-4 w-4 text-primary" />,
+          kind: "action",
+          group: "Ações",
+          action: () => { focusNode(selectedId); onOpenNodeEditor(); close(); },
+        });
+      }
     }
 
     // Filter actions
@@ -155,7 +174,7 @@ export function CommandPalette({ open, onClose, onOpenAIPanel }: Props) {
       });
     }
     return list.slice(0, 30);
-  }, [query, nodes, focusNode, close, fitToView, addNode, viewport, aiEnabled, onOpenAIPanel]);
+  }, [query, nodes, focusNode, close, fitToView, addNode, viewport, aiEnabled, onOpenAIPanel, onOpenNodeEditor]);
 
   // Reset active when items change
   useEffect(() => {
