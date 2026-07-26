@@ -145,30 +145,44 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
 
   const isToolActive = (toolId: string) => tool === toolId;
 
+  const zoomPercent = Math.round(viewport.zoom * 100);
+
   return (
-    <div className="relative z-40 flex items-center gap-2 px-2 py-1.5 border-b border-border bg-card/80 backdrop-blur-md overflow-x-auto">
-      {/* Group 1: Sidebar toggle | Select, Pan, Connect tools */}
+    <div className="relative z-40 flex items-center gap-2 px-2 py-1.5 border-b border-border overflow-x-auto toolbar-container">
+      {/* Bottom shadow gradient for depth */}
+      <div className="toolbar-shadow" />
+
+      {/* ── Brand Section (far-left) ── */}
+      <div className="toolbar-brand flex items-center gap-1.5 mr-1 shrink-0">
+        <BrainCircuit className="h-5 w-5 toolbar-brand-icon brand-gradient-icon" />
+        <span className="text-sm font-semibold brand-gradient tracking-wide">Mapa Mental</span>
+      </div>
+
+      {/* Gradient divider */}
+      <div className="toolbar-divider" />
+
+      {/* Group 1: Select, Pan, Connect tools */}
       <span className="toolbar-group">
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSidebar} title="Mapas">
-          <BrainCircuit className="h-4 w-4" />
-        </Button>
-        <div className="h-4 w-px bg-border mx-0.5" />
         {toolButtons.map((tb) => (
           <Button
             key={tb.toolId}
             variant={isToolActive(tb.toolId) ? "default" : "ghost"}
             size="icon"
-            className={`h-8 w-8 transition-all ${isToolActive(tb.toolId) ? "active-tool-ring" : ""}`}
+            className={`h-8 w-8 transition-all relative toolbar-btn ${isToolActive(tb.toolId) ? "active-tool-ring" : ""}`}
             onClick={() => setTool(tb.toolId as "select" | "pan" | "connect")}
-            title={`${tb.label} (${tb.shortcut})`}
+            data-tooltip={`${tb.label} (${tb.shortcut})`}
           >
             {tb.icon}
-            {shortcutsEnabled && !isToolActive(tb.toolId) && (
-              <span className="absolute -top-1 -right-1 text-[8px] bg-muted text-muted-foreground rounded px-0.5 leading-none opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none" />
+            {/* Pulsing dot indicator when active */}
+            {isToolActive(tb.toolId) && (
+              <span className="toolbar-active-dot" />
             )}
           </Button>
         ))}
       </span>
+
+      {/* Gradient divider */}
+      <div className="toolbar-divider" />
 
       {/* Group 2: Add node dropdown + Undo/Redo */}
       <span className="toolbar-group">
@@ -176,28 +190,28 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1 transition-colors"
+            className="h-8 gap-1 transition-colors toolbar-btn"
             onClick={() => setAddMenuOpen(!addMenuOpen)}
-            title="Adicionar nó"
+            data-tooltip="Adicionar nó (A)"
           >
             <PlusCircle className="h-4 w-4" />
             <span className="text-xs hidden sm:inline">Adicionar</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
           {addMenuOpen && (
-            <div className="absolute top-full left-0 mt-1.5 z-[100] bg-popover border border-border rounded-lg shadow-2xl p-1.5 min-w-[200px] fade-in backdrop-blur-xl">
-              <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo de nó</p>
+            <div className="absolute top-full left-0 mt-1.5 z-[100] toolbar-dropdown fade-in">
+              <p className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo de nó</p>
               {Object.entries(NODE_KIND_META).map(([kind, meta]) => (
                 <button
                   key={kind}
-                  className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md hover:bg-accent text-xs transition-colors group"
+                  className="toolbar-dropdown-item"
                   onClick={() => {
                     handleAddNode(kind as NodeKind);
                     setAddMenuOpen(false);
                   }}
                 >
                   <div
-                    className="h-6 w-6 rounded-md flex items-center justify-center transition-transform group-hover:scale-110"
+                    className="toolbar-dropdown-icon"
                     style={{ background: `${meta.color}22`, color: meta.color }}
                   >
                     <span className="text-[10px] font-bold">{meta.label[0]}</span>
@@ -211,62 +225,72 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         </div>
         {undoRedoEnabled && (
           <>
-            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={undo} disabled={past.length === 0} title={`Desfazer (${SHORTCUT_MAP.undo})`}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={undo} disabled={past.length === 0} data-tooltip={`Desfazer (${SHORTCUT_MAP.undo})`}>
               <Undo2 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={redo} disabled={future.length === 0} title={`Refazer (${SHORTCUT_MAP.redo})`}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={redo} disabled={future.length === 0} data-tooltip={`Refazer (${SHORTCUT_MAP.redo})`}>
               <Redo2 className="h-4 w-4" />
             </Button>
           </>
         )}
       </span>
 
+      {/* Gradient divider */}
+      <div className="toolbar-divider" />
+
       {/* Selection actions (shown when nodes selected) */}
       {selectedNodeIds.length > 0 && (
-        <span className="toolbar-group">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors" onClick={handleDeleteSelected} title={`Excluir selecionados (${SHORTCUT_MAP.delete})`}>
-            <Trash2 className="h-4 w-4" />
-            <ToolTipBadge shortcut={SHORTCUT_MAP.delete} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={handleDuplicateSelected} title={`Duplicar (${SHORTCUT_MAP.duplicate})`}>
-            <Copy className="h-4 w-4" />
-            <ToolTipBadge shortcut={SHORTCUT_MAP.duplicate} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenNodeEditor} title={`Editar nó (${SHORTCUT_MAP.edit})`}>
-            <Edit3 className="h-4 w-4" />
-            <ToolTipBadge shortcut={SHORTCUT_MAP.edit} />
-          </Button>
-        </span>
+        <>
+          <span className="toolbar-group">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive transition-colors toolbar-btn" onClick={handleDeleteSelected} data-tooltip={`Excluir selecionados (${SHORTCUT_MAP.delete})`}>
+              <Trash2 className="h-4 w-4" />
+              <ToolTipBadge shortcut={SHORTCUT_MAP.delete} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={handleDuplicateSelected} data-tooltip={`Duplicar (${SHORTCUT_MAP.duplicate})`}>
+              <Copy className="h-4 w-4" />
+              <ToolTipBadge shortcut={SHORTCUT_MAP.duplicate} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenNodeEditor} data-tooltip={`Editar nó (${SHORTCUT_MAP.edit})`}>
+              <Edit3 className="h-4 w-4" />
+              <ToolTipBadge shortcut={SHORTCUT_MAP.edit} />
+            </Button>
+          </span>
+          <div className="toolbar-divider" />
+        </>
       )}
 
       {/* Group 3: Zoom controls */}
       <span className="toolbar-group">
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(1.2)} title="Zoom+ (+)">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => zoomBy(1.2)} data-tooltip="Zoom+ (+)">
           <ZoomIn className="h-4 w-4" />
         </Button>
-        <span className="text-xs text-muted-foreground w-10 text-center tabular-nums select-none">{Math.round(viewport.zoom * 100)}%</span>
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => zoomBy(0.8)} title="Zoom− (−)">
+        {/* Zoom percentage badge */}
+        <span className="toolbar-zoom-badge">{zoomPercent}%</span>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => zoomBy(0.8)} data-tooltip="Zoom− (−)">
           <ZoomOut className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => fitToView(80)} title={`Ajustar à tela (${SHORTCUT_MAP.fitToView})`}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => fitToView(80)} data-tooltip={`Ajustar à tela (${SHORTCUT_MAP.fitToView})`}>
           <Maximize className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={organizeLayout} title="Organizar layout">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={organizeLayout} data-tooltip="Organizar layout">
           <LayoutGrid className="h-4 w-4" />
         </Button>
       </span>
 
+      {/* Gradient divider */}
+      <div className="toolbar-divider" />
+
       {/* Group 4: Search bar — more prominent */}
       <button
         onClick={onOpenSearch}
-        className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-lg border border-border bg-muted/40 hover:bg-accent transition-colors text-sm text-muted-foreground brand-gradient-focus"
-        title="Buscar (Ctrl+K)"
+        className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-lg border border-border bg-muted/40 hover:bg-accent transition-colors text-sm text-muted-foreground toolbar-search-btn"
+        data-tooltip="Buscar (Ctrl+K)"
       >
         <Search className="h-4 w-4" />
         <span className="font-medium">Buscar...</span>
         <kbd className="ml-3 text-[10px] bg-background px-1.5 py-0.5 rounded border border-border font-mono">⌘K</kbd>
       </button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors md:hidden" onClick={onOpenSearch} title="Buscar (Ctrl+K)">
+      <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors md:hidden toolbar-btn" onClick={onOpenSearch} data-tooltip="Buscar (Ctrl+K)">
         <Search className="h-4 w-4" />
       </Button>
 
@@ -276,20 +300,20 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       {/* Group 5: Shortcuts, AI, Export, Settings */}
       <span className="toolbar-group">
         {shortcutsEnabled && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenShortcuts} title="Atalhos de teclado">
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenShortcuts} data-tooltip="Atalhos de teclado (?)">
             <Keyboard className="h-4 w-4" />
           </Button>
         )}
         {aiEnabled && (
-          <Button variant="ghost" size="sm" className="h-8 gap-1 transition-colors" onClick={onOpenAIPanel} title="IA">
-            <Sparkles className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 gap-1 transition-colors toolbar-btn toolbar-ai-btn" onClick={onOpenAIPanel} data-tooltip="IA">
+            <Sparkles className="h-4 w-4 toolbar-sparkle-icon" />
             <span className="text-xs hidden sm:inline">IA</span>
           </Button>
         )}
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenExport} title="Exportar">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenExport} data-tooltip="Exportar (⤓)">
           <Download className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={onOpenSettings} title="Configurações">
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenSettings} data-tooltip="Configurações (⚙)">
           <Settings2 className="h-4 w-4" />
         </Button>
       </span>

@@ -55,6 +55,8 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
   const [editingPosition, setEditingPosition] = useState<{ mx: number; my: number } | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [hoveredLabelId, setHoveredLabelId] = useState<string | null>(null);
+  // Track if this was a path-double-click that added a default label
+  const [pathDoubleClickEdgeId, setPathDoubleClickEdgeId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // When editing starts, focus the input
@@ -83,10 +85,12 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
   const handlePathDoubleClick = useCallback(
     (edgeId: string, mx: number, my: number) => {
       // Double-click on edge path: add default label and open editor
+      // Remember this was a path-double-click so cancel can remove the default label
       updateEdge(edgeId, { label: "nova conexão" });
       setEditingValue("nova conexão");
       setEditingEdgeId(edgeId);
       setEditingPosition({ mx, my });
+      setPathDoubleClickEdgeId(edgeId);
     },
     [updateEdge]
   );
@@ -104,21 +108,25 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
     setEditingEdgeId(null);
     setEditingPosition(null);
     setEditingValue("");
+    setPathDoubleClickEdgeId(null);
   }, [editingEdgeId, editingValue, updateEdge]);
 
   const handleEditCancel = useCallback(() => {
-    // If we just set "nova conexão" as default and the user cancels, remove it
+    // If we set a default "nova conexão" label on a path-double-click and user cancels,
+    // remove that default label (it wasn't there before)
     if (editingEdgeId) {
       const edge = edges.find((e) => e.id === editingEdgeId);
-      if (edge && edge.label === "nova conexão" && editingValue === "nova conexão") {
-        // Check if this was a new default label (user clicked on path with no label)
-        // We can't definitively know, so just keep whatever was set
+      // Only remove if the label was the default one we just added from handlePathDoubleClick
+      // Check if the original edge had no label and we set the default
+      if (pathDoubleClickEdgeId === editingEdgeId) {
+        updateEdge(editingEdgeId, { label: null });
       }
     }
     setEditingEdgeId(null);
     setEditingPosition(null);
     setEditingValue("");
-  }, [editingEdgeId, editingValue, edges]);
+    setPathDoubleClickEdgeId(null);
+  }, [editingEdgeId, edges, updateEdge, pathDoubleClickEdgeId]);
 
   const selectedNodeSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 

@@ -1,0 +1,302 @@
+     1→   201→   201→  - Wired new `onOpenNodeEditor` prop through page.tsx → Toolbar.
+     2→   202→   202→  - Added keyboard shortcut `E` or `Enter` (when not in input) to open Node Editor for the selected node.
+     3→   203→   203→
+     4→   204→   204→- **New feature**: Node duplication (Ctrl+D / Cmd+D)
+     5→   205→   205→  - Added `duplicateNode(id)` action to mindmap-store: copies the node with offset (+32,+32), title suffix " (cópia)", resets collapsed, selects the new node.
+     6→   206→   206→  - Wired global Ctrl+D keyboard handler in MindMapCanvas (skips when typing in inputs).
+     7→   207→   207→  - Added a Duplicate button to the Toolbar (shown when a node is selected).
+     8→   208→   208→  - Verified via QA: pressing Ctrl+D on "Tema Central" produced "Tema Central (cópia)" with the editor automatically updating to show the new node's title.
+     9→   209→   209→
+    10→   210→   210→- **New feature**: Multi-node box selection (drag on empty canvas with the Select tool)
+    11→   211→   211→  - Added new dragType "box" to MindMapCanvas pointer state machine.
+    12→   212→   212→  - When the Select tool is active and the user pointer-downs on the empty canvas (not a node), a box-selection rectangle is drawn.
+    13→   213→   213→  - On pointer-up, all nodes intersecting the world-space rect are selected in bulk.
+    14→   214→   214→  - Drags <4px are treated as plain clicks (clear selection) — prevents accidental clearing.
+    15→   215→   215→  - Added a multi-selection info pill at the bottom of the canvas showing count + Del/Ctrl+D hints.
+    16→   216→   216→  - Respects the `editor.multiSelect` settings toggle.
+    17→   217→   217→
+    18→   218→   218→- **New feature**: Map rename (inline edit in Sidebar)
+    19→   219→   219→  - Added rename button (Edit3 icon) that appears on hover for each map in the Sidebar.
+    20→   220→   220→  - Inline Input replaces the title; Enter commits, Escape cancels.
+    21→   221→   221→  - Rename uses a 2-step PUT (fetch current → PUT with new title + existing nodes/edges).
+    22→   222→   222→  - If renaming the currently-loaded map, also calls `setMeta()` in the store so the UI updates live.
+    23→   223→   223→
+    24→   224→   224→- **New feature**: Map templates (4 ready-to-use templates in Sidebar)
+    25→   225→   225→  - Created `src/lib/templates.ts` with `MINDMAP_TEMPLATES`: Brainstorm (5W2H), Projeto (planning), Estudo (book/subject summary), Decisão (pros/cons with criteria).
+    26→   226→   226→  - Each template ships with pre-positioned nodes (radial layout) and labeled edges.
+    27→   227→   227→  - Updated POST `/api/maps` to accept `nodes` and `edges` arrays (validated against the NodeKind/EdgeKind enums). Edge source/target are index-based strings resolved to real node IDs after creation.
+    28→   228→   228→  - Sidebar now has a 2-tab layout: "Mapas (N)" and "Templates". The Templates tab shows 4 cards with emoji, name, description, node/edge counts, and a "Usar template" button.
+    29→   229→   229→  - Per-template loading state ("Criando...") while the API call is in flight.
+    30→   230→   230→  - AI hint card at the bottom of Templates suggests using the IA → Gerar mapa tab for custom topics.
+    31→   231→   231→  - Verified via QA: clicking "Usar template" on Brainstorm created a 7-node map with 6 labeled edges and proper layout.
+    32→   232→   232→
+    33→   233→   233→- **Polish**: Properly disabled button visuals
+    34→   234→   234→  - All AIPanel action buttons (Expandir/Gerar/Resumir/Sugerir/Imagem/Auto-layout) now apply `opacity-40 cursor-not-allowed` classes when disabled, in addition to the native `disabled` attribute. Users can clearly see when an action is unavailable.
+    35→   235→   235→
+    36→   236→   236→- **Polish**: Larger node defaults (no more clipping)
+    37→   237→   237→  - Default node size bumped from 200×80 to 220×88 across MindMapCanvas (double-click add, keyboard shortcuts), Toolbar (Adicionar menu), and CommandPalette (add-node actions).
+    38→   238→   238→  - All new templates also use the larger size.
+    39→   239→   239→
+    40→   240→   240→- **Polish**: Improved empty state
+    41→   241→   241→  - Added an `animate-ping` halo behind the Sparkles icon.
+    42→   242→   242→  - Kbd hints now grouped with labels (C Conceito, P Pergunta, etc.) plus ⌘K Buscar.
+    43→   243→   243→  - Italic tip at bottom pointing users to the Templates panel.
+    44→   244→   244→
+    45→   245→   245→- **Polish**: ShortcutsPanel redesigned
+    46→   246→   246→  - Grouped all 23 shortcuts into 5 categories (Geral, Edição, Adicionar, Mouse, Visualização).
+    47→   247→   247→  - Modal now max-w-md, max-h-85vh with scroll, hover-highlighted rows.
+    48→   248→   248→  - Footer note explains how to disable shortcuts via Settings.
+    49→   249→   249→  - Added entries for: Ctrl+K, Ctrl+D, E/Enter (edit), Clique duplo (nó) → Abrir editor, Arrastar (bg, tool Select) → Seleção por caixa.
+    50→   250→   250→
+    51→   251→   251→- **Polish**: CommandPalette "Edit selected node" command
+    52→   252→   252→  - Added new "Editar nó: <title>" action that appears at the top of the actions list when a node is selected (hint: `E`).
+    53→   253→   253→  - Selecting it focuses the node and opens the Node Editor.
+    54→   254→   254→
+    55→   255→   255→QA verification:
+    56→   256→   256→- All new features manually verified via agent-browser + VLM:
+    57→   257→   257→  - Template creation: ✅ 7-node brainstorm map created with labeled edges and proper layout.
+    58→   258→   258→  - Toolbar buttons: ✅ "Excluir / Duplicar / Editar" appear only when a node is selected.
+    59→   259→   259→  - Edit button: ✅ Opens NodeEditor with the selected node's data.
+    60→   260→   260→  - Ctrl+D duplication: ✅ Creates "Tema Central (cópia)" with editor auto-updating to the new selection.
+    61→   261→   261→  - Sidebar tabs: ✅ Mapas (2) and Templates both work.
+    62→   262→   262→- Lint: ✅ 0 errors, 0 warnings.
+    63→   263→   263→- Dev server: ✅ No runtime errors in logs (PUT /api/maps returned 200 with proper COMMIT).
+    64→   264→   264→
+    65→   265→   265→Stage Summary:
+    66→   266→   266→- **All lint clean**, **all features verified via QA**, **no known bugs**.
+    67→   267→   267→- **Major UX gap closed**: users can now edit existing nodes via (a) double-click on node, (b) Edit button in toolbar, (c) `E`/`Enter` keyboard shortcut, (d) "Editar nó" command in Ctrl+K palette.
+    68→   268→   268→- **New productivity features**: node duplication (Ctrl+D), multi-node box selection (drag with Select tool), map templates (4 ready-to-use), inline map rename.
+    69→   269→   269→- **Polish**: properly disabled buttons, larger node defaults (no clipping), animated empty state, redesigned shortcuts panel with categories.
+    70→   270→   270→- **Dev server**: started with `setsid` detachment; accessible via gateway port 81 for agent-browser QA.
+    71→   271→   271→- **Recommended next steps**: (1) Add JSON import (POST `/api/maps/import`), (2) Add edge label editing (double-click on edge → prompt), (3) Add drag-to-reorder for Sidebar items (starred/favorites), (4) Add a "share" link with read-only view, (5) Add node alignment guides (snap to siblings), (6) Consider adding quick emoji/icon picker for nodes, (7) Consider adding Mermaid/markdown export with preview.
+    72→   272→   272→
+    73→   273→   273→---
+    74→   274→   274→Task ID: 5-b
+    75→   275→   275→Agent: full-stack-developer
+    76→   276→   276→Task: Add new features: edge label editing, JSON import, contextual floating toolbar, onboarding tour, map deletion confirmation
+    77→   277→   277→
+    78→   278→   278→Work Log:
+    79→   279→   279→- Read worklog.md to understand project context (all components built, lint clean, app functional)
+    80→   280→   280→- Read all existing source files: MapEdges.tsx, ExportPanel.tsx, MindMapCanvas.tsx, Sidebar.tsx, SettingsPanel.tsx, page.tsx, mindmap-store.ts, types.ts, settings.ts, templates.ts, alert-dialog.tsx, Toolbar.tsx, use-tool-context.tsx
+    81→   281→   281→- Implemented Feature 1: Edge Label Editing in MapEdges.tsx
+    82→   282→   282→  - Added `editingEdgeId`, `editingPosition`, `editingValue`, `hoveredLabelId` state variables
+    83→   283→   283→  - Double-click on edge label `<g>` element triggers inline edit via `<foreignObject>` with `<input>` positioned at the label midpoint
+    84→   284→   284→  - Enter saves the new label (calls `updateEdge(id, { label: newValue })`), Escape cancels
+    85→   285→   285→  - If edge has no label, double-clicking the edge path itself adds a default label ("nova conexão") and opens the editor
+    86→   286→   286→  - Added tooltip hint "Clique duplo para editar label" when hovering over a label
+    87→   287→   287→  - Input auto-focuses and selects text on edit start
+    88→   288→   288→
+    89→   289→   289→- Implemented Feature 2: JSON Import in ExportPanel.tsx
+    90→   290→   290→  - Added a 5th export card: "Importar JSON" with Upload icon, distinct primary-colored border
+    91→   291→   291→  - Added hidden file input that accepts `.json` files, triggered by "Selecionar arquivo" button
+    92→   292→   292→  - Created `validateImportJSON()` function that checks: JSON is object, has nodes/edges arrays, each node has title, each edge has sourceId/targetId, at least 1 node
+    93→   293→   293→  - On valid file: transforms imported data to API-compatible format (maps old node IDs to array indices for edge resolution)
+    94→   294→   294→  - Calls POST `/api/maps` with imported title + transformed nodes/edges
+    95→   295→   295→  - After success, loads the new map via `loadMap()` and closes the panel
+    96→   296→   296→  - Shows validation error messages in red `bg-destructive/10` box if JSON is invalid
+    97→   297→   297→  - Added sample JSON structure hint in a code block below the import button
+    98→   298→   298→  - Changed panel header from "Exportar" to "Exportar / Importar"
+    99→   299→   299→  - Added `importError` state and `importing` state type
+   100→   300→   300→
+   101→   301→   301→- Implemented Feature 3: Contextual Floating Toolbar (FloatingToolbar.tsx)
+   102→   302→   302→  - Created new component with Edit, Delete, Duplicate, Change Color, Collapse/Expand actions
+   103→   303→   303→  - Appears as a floating panel near the selected node (positioned above, offset by -20px in screen space)
+   104→   304→   304→  - Uses framer-motion for smooth appearance animation (slide down + fade in)
+   105→   305→   305→  - Color dropdown with 10 preset colors shown on hover over Palette icon
+   106→   306→   306→  - Shows current node title as truncated label
+   107→   307→   307→  - Dismissible by clicking outside (natural DOM behavior) or pressing Escape (clears selection)
+   108→   308→   308→  - Only renders when `selectedNodeIds.length === 1`
+   109→   309→   309→
+   110→   310→   310→- Implemented Feature 4: First-Use Onboarding Tour (OnboardingTour.tsx)
+   111→   311→   311→  - Created new component with 5 tour steps: Welcome, Add nodes, Toolbar, AI panel, Settings
+   112→   312→   312→  - Each step has title, description, and optional target CSS selector for highlighting
+   113→   313→   313→  - Step indicator shows progress (filled/active/empty dots)
+   114→   314→   314→  - Back/Next/Skip/Finish buttons with proper navigation
+   115→   315→   315→  - Highlight ring animation (pulse-ring CSS keyframe) around target elements
+   116→   316→   316→  - Sparkles icon for center-positioned steps
+   117→   317→   317→  - Persists "tour completed" flag in localStorage (`mindmap-tour-completed`)
+   118→   318→   318→  - Tour only shows once (auto-checks localStorage on mount)
+   119→   319→   319→  - Exported `replayTour()` utility function that clears localStorage to allow re-triggering
+   120→   320→   320→  - Added "Repetir tour de introdução" button in SettingsPanel visual category (with MapPin icon)
+   121→   321→   321→  - Wired `onReplayTour` prop through page.tsx → SettingsPanel
+   122→   322→   322→
+   123→   323→   323→- Implemented Feature 5: Map Deletion Confirmation in Sidebar.tsx
+   124→   324→   324→  - Replaced `window.confirm()` with shadcn/ui AlertDialog component
+   125→   325→   325→  - Added `deleteConfirmId` and `deleteConfirmTitle` state variables
+   126→   326→   326→  - Delete button now calls `handleRequestDelete(id, title)` which opens AlertDialog
+   127→   327→   327→  - AlertDialog shows: "Excluir mapa?" title, description with quoted map title, "Esta ação não pode ser desfeita."
+   128→   328→   328→  - Red "Excluir" confirm button (`bg-destructive text-destructive-foreground`)
+   129→   329→   329→  - Gray "Cancelar" cancel button (default AlertDialogAction styling)
+   130→   330→   330→  - On confirm: actually deletes via DELETE API, refreshes maps, creates new map if current was deleted
+   131→   331→   331→
+   132→   332→   332→- Wired all new components into page.tsx
+   133→   333→   333→  - Imported FloatingToolbar and OnboardingTour
+   134→   334→   334→  - Rendered `<FloatingToolbar onOpenNodeEditor={handleOpenNodeEditor} />` inside the main content area (next to MindMapCanvas)
+   135→   335→   335→  - Rendered `<OnboardingTour forceShow={tourForceShow} />` at root level
+   136→   336→   336→  - Added `tourForceShow` state and `handleReplayTour` callback
+   137→   337→   337→  - SettingsPanel now receives `onReplayTour` prop
+   138→   338→   338→
+   139→   339→   339→- Ran `bun run lint` — initial errors in OnboardingTour.tsx:
+   140→   340→   340→  1. `handleFinish` accessed before declaration → moved declaration before `handleNext`
+   141→   341→   341→  2. setState-in-effect pattern → refactored to derive visibility from localStorage + dismissed state, removed all effects that set state synchronously
+   142→   342→   342→  3. Cannot access refs during render → removed all ref-based render logic, simplified to pure state-driven approach
+   143→   343→   343→  - Final lint: 0 errors, 0 warnings
+   144→   344→   344→
+   145→   345→   345→Stage Summary:
+   146→   346→   346→- **All 5 features implemented and lint-clean** (0 errors, 0 warnings)
+   147→   347→   347→- **Edge Label Editing**: double-click on label/path to inline edit, tooltip hint, Enter/Escape commit/cancel
+   148→   348→   348→- **JSON Import**: file input, validation, API POST with ID-to-index mapping, error messages, sample structure
+   149→   349→   349→- **Floating Toolbar**: contextual actions near selected node, color picker, collapse/expand, framer-motion animation
+   150→   350→   350→- **Onboarding Tour**: 5-step guided tour, localStorage persistence, highlight ring animation, replay via Settings
+   151→   351→   351→- **Map Deletion Confirmation**: shadcn AlertDialog with red "Excluir" button, quoted map title, undo warning
+   152→   352→   352→- **All new components wired into page.tsx** (FloatingToolbar, OnboardingTour, SettingsPanel onReplayTour prop)
+   153→   353→   353→- Dev server compiles without errors
+   154→   354→   354→
+   155→   355→   355→---
+   156→   356→   356→Task ID: 6
+   157→   357→   357→Agent: main (orchestrator)
+   158→   358→   358→Task: Assess current project status, perform QA with agent-browser, fix bugs, improve styling, add features, update worklog.
+   159→   359→   359→
+   160→   360→   360→Work Log:
+   161→   361→   361→- Read worklog.md to understand prior progress (all components built, lint clean, VLM-rated 8-9/10 in previous sessions)
+   162→   362→   362→- Checked dev server status — app running on port 3000, accessible via gateway port 81
+   163→   363→   363→- Ran `bun run lint` — 0 errors (clean)
+   164→   364→   364→- Performed comprehensive QA via agent-browser + VLM analysis:
+   165→   365→   365→  - Initial VLM rating: 7/10 (previous session had 8-9/10 but CSS parsing bug reduced quality)
+   166→   366→   366→  - Identified CSS parsing bug: `globals.css` line 312-313 used `var(--muted / 0.35)` and `var(--border / 0.5)` which is invalid CSS division syntax — causes build error overlay
+   167→   367→   367→  - Identified ExportPanel.tsx syntax error: missing parentheses around `if` condition at line 393
+   168→   368→   368→
+   169→   369→   369→- Fixed CSS parsing bug:
+   170→   370→   370→  - Changed `background: var(--muted / 0.35)` → `background: oklch(from var(--muted) l c h / 0.35)` → final fix: `background: color-mix(in srgb, var(--muted) 35%, transparent)`
+   171→   371→   371→  - Changed `border: 1px solid var(--border / 0.5)` → `border: 1px solid color-mix(in srgb, var(--border) 50%, transparent)`
+   172→   372→   372→  - The `oklch(from ...)` relative color syntax was also unsupported by Next.js CSS parser, so switched to `color-mix()` which works
+   173→   373→   373→
+   174→   374→   374→- Launched subagent 5-a (full-stack-developer) for ENHANCED STYLING:
+   175→   375→   375→  - globals.css: Added 8 new CSS utility classes (node-pulse, edge-glow, edge-animated-dash, active-tool-ring, brand-gradient-focus, pill-badge, chain-highlight, micro-hover-scale, toolbar-group)
+   176→   376→   376→  - MapEdges.tsx: Added SVG glow/shadow filter definitions, animated dash for selected edges, edge opacity boost (0.7→0.8), arrowhead indicators at target endpoints, label font 11→12px with better padding, hover tooltip hint for label editing
+   177→   377→   377→  - MapNode.tsx: Added `isHighlighted` prop, linear-gradient background (135deg), accent stripe 4→5px with glow effect, chain-highlight for connected selected nodes, micro-hover-scale animation, node-pulse entrance animation
+   178→   378→   378→  - Toolbar.tsx: 5 toolbar-group pill containers (Tools, Add+Undo, Selection, Zoom, Actions), ToolTipBadge shortcut indicators, active-tool-ring glow, brand-gradient-focus search bar, LayoutGrid organize button
+   179→   379→   379→  - StatusBar.tsx: 3-column grid layout, pill-badge styled badges, kind-count badges with colored left-border, hover underline on editable title
+   180→   380→   380→  - MindMapCanvas.tsx: Active path highlighting (highlightedNodeIds from ancestor+descendant BFS), isHighlighted prop passed to each MapNodeView
+   181→   381→   381→
+   182→   382→   382→- Launched subagent 5-b (full-stack-developer) for NEW FEATURES:
+   183→   383→   383→  - Edge Label Editing: double-click on label/path to inline edit via foreignObject+input, Enter saves, Escape cancels, tooltip hint
+   184→   384→   384→  - JSON Import: 5th card in ExportPanel with file input, validateImportJSON(), POST /api/maps, loadMap, error messages, sample structure hint
+   185→   385→   385→  - Contextual Floating Toolbar (FloatingToolbar.tsx): Edit, Delete, Duplicate, Color Picker (10 presets), Collapse/Expand, framer-motion animation, positioned above selected node
+   186→   386→   386→  - Onboarding Tour (OnboardingTour.tsx): 5 steps (Welcome, Add nodes, Toolbar, AI, Settings), progress dots, highlight ring, localStorage persistence, replay via SettingsPanel
+   187→   387→   387→  - Map Deletion Confirmation: shadcn AlertDialog with red "Excluir" button, quoted map title, undo warning
+   188→   388→   388→
+   189→   389→   389→- QA verified after CSS fix + features:
+   190→   390→   390→  - VLM rated 8/10 initially (CSS fix resolved build error overlay)
+   191→   391→   391→  - VLM rated 8.5/10 after tour completion (no bugs, good toolbar grouping, polished onboarding)
+   192→   392→   392→  - VLM rated 7.5-8/10 after full canvas view (nodes properly spaced after organize layout)
+   193→   393→   393→
+   194→   394→   394→- Additional polish improvements (round 6):
+   195→   395→   395→  - Increased onboarding tour backdrop: bg-black/30 → bg-black/50, backdrop-blur-[1px] → backdrop-blur-[3px]
+   196→   396→   396→  - Minimap: Added header with "Minimap" label and zoom percentage, bg-card/90 + fade-in, size 160×120 → 170×110
+   197→   397→   397→  - Edge visibility: Base opacity 0.7 → 0.8, connected opacity 0.85 → 0.9, arrowhead opacity 0.4 → 0.5
+   198→   398→   398→  - Organize layout button: Added `organizeLayout()` to mindmap-store (radial BFS layout + 3-iteration collision resolution), wired into Toolbar with LayoutGrid icon
+   199→   399→   399→
+   200→   400→   400→- Tested organize layout: VLM confirms nodes properly spaced, no overlapping, radial layout clear, rated 8/10
+   201→   401→   401→
+   202→   402→   402→Stage Summary:
+   203→   403→   403→- **All lint clean** (0 errors, 0 warnings throughout session)
+   204→   404→   404→- **CSS parsing bug fixed** — `var(--muted / 0.35)` → `color-mix(in srgb, var(--muted) 35%, transparent)` (oklch relative syntax also failed)
+   205→   405→   405→- **VLM design rating**: 7/10 (initial with CSS bug) → 8/10 (after fix) → 8.5/10 (after tour) → 8/10 (organized canvas)
+   206→   406→   406→- **8 new CSS utility classes** added for animations, glow effects, pill badges, chain highlights
+   207→   407→   407→- **6 major new features**: edge label editing, JSON import, floating toolbar, onboarding tour, map deletion confirmation, organize layout
+   208→   408→   408→- **Edge visibility improved**: arrowhead indicators, glow filters, animated dash for selected, opacity boost
+   209→   409→   409→- **Node styling enhanced**: gradient backgrounds, accent stripe glow, chain highlights, micro-hover-scale, pulse entrance
+   210→   410→   410→- **Toolbar redesigned**: 5 grouped pill containers, shortcut tooltip badges, active-tool-ring glow, organize button
+   211→   411→   411→- **StatusBar redesigned**: 3-column grid, pill-badge counts, colored kind-count badges
+   212→   412→   412→- **Minimap improved**: header label + zoom display
+   213→   413→   413→- **Active path highlighting**: ancestors + descendants of selected nodes get soft glow borders
+   214→   414→   414→- **No runtime errors** (console clean, 0 page errors)
+   215→   415→   415→
+   216→   416→   416→Unresolved issues / Risks:
+   217→   417→   417→- `color-mix()` CSS function is relatively modern — may not work in very old browsers (but works in all modern browsers)
+   218→   418→   418→- Node `color-mix()` in MapNode.tsx inline styles (gradient bg) — should verify in production browsers
+   219→   419→   419→- ExportPanel.tsx had a cached syntax error in console — but source file is correct; may need full reload to clear cached errors
+   220→   420→   420→- Recommended next steps: (1) Add emoji/icon picker for nodes, (2) Add Mermaid export, (3) Add real-time collaboration cursors, (4) Add alignment guides (snap to siblings), (5) Consider onboarding improvements based on VLM feedback
+   221→   421→   421→
+   222→   422→   422→---
+   223→   423→   423→Task ID: 5-a
+   224→   424→   424→Agent: frontend-styling-expert
+   225→   425→   425→Task: Enhance globals.css with more polish, animations, and styling details.
+   226→   426→   426→
+   227→   427→   427→Work Log:
+   228→   428→   428→- Read worklog.md to understand prior progress (Tasks 0-4 complete, full app built)
+   229→   429→   429→- Read existing globals.css (340 lines, OKLCH color variables, canvas grid, brand-gradient, node-glow, pill-badge, etc.)
+   230→   430→   430→- Added 7 new CSS custom properties in both `:root` and `.dark`:
+   231→   431→   431→  - `--canvas-grid-highlight` — faint cross-hatch line color
+   232→   432→   432→  - `--node-hover-bg` — node background on hover
+   233→   433→   433→  - `--panel-bg` — semi-transparent panel background
+   234→   434→   434→  - `--panel-shadow` — panel shadow (lighter in light mode, deeper in dark)
+   235→   435→   435→  - `--toolbar-bg` — semi-transparent toolbar background
+   236→   436→   436→  - `--gradient-start` / `--gradient-end` — accent gradient endpoints
+   237→   437→   437→- Added `.canvas-gradient-bg` — layered radial gradient background (3 subtle color blobs)
+   238→   438→   438→- Enhanced `.brand-gradient` — 3-color gradient (start → purple → end → start) with 300% background-size, 8s ease-in-out ping-pong animation
+   239→   439→   439→- Added `.glass-panel` — backdrop-blur(16px) saturate(1.4), semi-transparent bg, subtle border
+   240→   440→   440→- Added `.node-hover-lift` — smooth translateY(-2px) with cubic-bezier easing and enhanced shadow
+   241→   441→   441→- Added `.panel-slide-in` — slide from right animation (0.3s cubic-bezier)
+   242→   442→   442→- Added `.toast-slide-in` / `.toast-slide-out` — slide from/to right for toast notifications
+   243→   443→   443→- Enhanced `.canvas-grid-bg` — added subtle cross-hatch lines via repeating-linear-gradient (0.5px faint lines at 28px intervals)
+   244→   444→   444→- Added `.edge-type-badge` — small uppercase badge for edge labels (backdrop-blur, pointer-events: none)
+   245→   445→   445→- Enhanced `.pill-badge` — added `box-shadow: inset 0 1px 2px rgba(0,0,0,0.06)` for subtle inner shadow
+   246→   446→   446→- Added `.shimmer` — loading state animation with pseudo-element sweep (1.8s ease-in-out)
+   247→   447→   447→- Enhanced `.scroll-thin` — reduced width to 6px, color-mix for transparency, Firefox scrollbar support, corner transparent
+   248→   448→   448→- Added `.toolbar-divider` — 1px vertical separator with 60% border color
+   249→   449→   449→- Added `.context-menu` — glassmorphism right-click menu with backdrop-blur(20px), scale-in animation, plus `.context-menu-item` and `.context-menu-separator` sub-classes
+   250→   450→   450→
+   251→   451→   451→All existing styles preserved. File grew from 340 to ~460 lines.
+   252→   452→   452→
+   253→   453→   453→---
+   254→   454→   454→Task ID: 7
+   255→   455→   455→Agent: frontend-styling-expert
+   256→   456→   456→Task: Enhance Toolbar.tsx with more visual polish and detail (11 specific enhancements).
+   257→   457→   457→
+   258→   458→   458→Work Log:
+   259→   459→   459→- Read worklog.md (Tasks 0–5a complete, full app built, globals.css enhanced)
+   260→   460→   460→- Read Toolbar.tsx (298 lines) — had tool buttons, add dropdown, undo/redo, zoom, search, settings/AI/export
+   261→   461→   461→- Read globals.css — had existing `.toolbar-group` class (simple pill container), `.active-tool-ring`, `.brand-gradient`, `.brand-gradient-focus`
+   262→   462→   462→
+   263→   463→   463→Enhancements implemented:
+   264→   464→   464→
+   265→   465→   465→1. **Toolbar container gradient** — Changed from `bg-card/80 backdrop-blur-md` to `.toolbar-container` class with `linear-gradient(to right, card/80 → muted/30)` + `backdrop-filter: blur(16px) saturate(1.2)`
+   266→   466→   466→2. **Bottom shadow gradient** — Added `.toolbar-shadow` div (absolute positioned, 6px tall gradient from border → transparent) for depth effect
+   267→   467→   467→3. **Toolbar-group inner glow** — Enhanced `.toolbar-group` CSS: added `backdrop-filter: blur(8px)`, inner border glow (`inset box-shadow` with foreground/primary tint), hover state that intensifies the primary glow
+   268→   468→   468→4. **Brand section** — Added far-left section with animated BrainCircuit icon (`.toolbar-brand-icon` — gentle bobbing `translateY(-2px)` animation) + `.brand-gradient-icon` (primary stroke, drop-shadow glow) + "Mapa Mental" text using existing `.brand-gradient`
+   269→   469→   469→5. **CSS tooltips** — Added `data-tooltip` attribute on all tool buttons/search bar, CSS `::after` pseudo-element that reads `attr(data-tooltip)`, appears above on hover with fade-in + slide-up animation, popover bg + border + shadow
+   270→   470→   470→6. **Search bar gradient border** — `.toolbar-search-btn` has hover border tinted with primary + glow, focus state uses `border-image` with brand gradient + `box-shadow` ring glow
+   271→   471→   471→7. **Gradient dividers** — Added `.toolbar-divider` between each toolbar group (1px wide, 24px tall, gradient from border color → transparent top-to-bottom)
+   272→   472→   472→8. **Pulsing dot indicator** — `.toolbar-active-dot` — absolute positioned 5px circle below active tool buttons, `toolbar-dot-pulse` animation (scale 1→0.6, opacity 1→0.4)
+   273→   473→   473→9. **Dropdown improvements** — `.toolbar-dropdown` wider (260px min-width), more padding, heavier shadow, 20px backdrop-blur; `.toolbar-dropdown-item` has hover slide-right (`translateX(4px)`) + primary tinted shadow; `.toolbar-dropdown-icon` scales up 1.15x + rotates 6° on hover
+   274→   474→   474→10. **Zoom percentage badge** — `.toolbar-zoom-badge` styled as a small pill badge between zoom in/out buttons (background mix, border, font-weight 600, min-width 2.75rem, tabular-nums)
+   275→   475→   475→11. **AI sparkle animation** — `.toolbar-ai-btn` has accent-tinted background + primary border + hover glow; `.toolbar-sparkle-icon` has `sparkle-glow` animation (2s ease-in-out infinite: rotating ±10° + varying drop-shadow glow intensity from 2px→8px)
+   276→   476→   476→
+   277→   477→   477→All existing functionality preserved. Toolbar.tsx rewritten with new CSS classes; globals.css received ~240 lines of new toolbar-specific styles. Build compiles successfully.
+   278→   478→   478→
+   279→   479→   479→---
+   280→   480→   480→Task ID: 5-b
+   281→   481→   481→Agent: frontend-styling-expert
+   282→   482→   482→Task: Enhance MapNode.tsx with 10 visual detail and polish improvements.
+   283→   483→   483→
+   284→   484→   484→Work Log:
+   285→   485→   485→- Read existing MapNode.tsx (219 lines) and all related files (types, settings, store, globals.css, tool context)
+   286→   486→   486→- Analyzed the full context: NODE_KIND_META provides labels like "Conceito", "Pergunta"; useTool provides connect tool state; node.createdAt supports fresh detection
+   287→   487→   487→- Implemented all 10 enhancements:
+   288→   488→   488→
+   289→   489→   489→1. **Inner gradient**: Replaced the 135deg diagonal gradient with a vertical 180deg gradient (top-light → bottom-slightly-dark) for more depth feel. Uses `color-mix(in oklch, var(--node-bg) 100%, white 6%)` at top fading to `color-mix(in oklch, var(--node-bg) 92%, var(--canvas-bg))` at bottom.
+   290→   490→   490→
+   291→   491→   491→2. **Kind badge**: Added a tiny text badge directly below the icon container showing `kindMeta.label` (e.g., "Conceito", "Pergunta"). Styled with accent color text, faint background (`accentColor`12), 8px font size, and small rounded corners.
+   292→   492→   492→
+   293→   493→   493→3. **Expand indicator**: When node has content (and is not collapsed), shows a `<MoreHorizontal>` (3 dots) icon at the bottom edge center, visible only on hover with opacity transition.
+   294→   494→   494→
+   295→   495→   495→4. **Left-side progress bar**: Added a 2px-wide bar positioned at `left: 6px` (just right of the accent stripe) with `linear-gradient(180deg, accentColor50 0%, accentColor00 100%)` — solid at top, fading to transparent at bottom. Opacity adjusts on hover/selection.
+   296→   496→   496→
+   297→   497→   497→5. **Improved accent stripe**: Widened from 5px to 6px. Changed from flat solid color to `linear-gradient(180deg, accentColor → accentColor88 → accentColor00)` — solid at top, fading at bottom. Added the same glow effect on selection/hover.
+   298→   498→   498→
+   299→   499→   499→6. **Hover inner glow**: When hovered, adds a faint radial gradient overlay (`radial-gradient(ellipse at 50% 30%, accentColor08, transparent)`) composited over the inner gradient background. Creates a subtle "lit from above" inner glow effect.
+   300→   500→   500→
+
+[showing lines 1-300 of 465; use offset=301 with limit to continue reading]

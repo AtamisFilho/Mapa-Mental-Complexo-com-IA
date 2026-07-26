@@ -10,16 +10,33 @@ import { SettingsPanel } from "@/components/mindmap/SettingsPanel";
 import { Minimap } from "@/components/mindmap/Minimap";
 import { StatusBar } from "@/components/mindmap/StatusBar";
 import { ThemeManager } from "@/components/mindmap/ThemeManager";
+import { ToastContainer } from "@/components/mindmap/ToastContainer";
 import { ShortcutsPanel } from "@/components/mindmap/ShortcutsPanel";
 import { ExportPanel } from "@/components/mindmap/ExportPanel";
 import { CommandPalette } from "@/components/mindmap/CommandPalette";
 import { FloatingToolbar } from "@/components/mindmap/FloatingToolbar";
 import { OnboardingTour, replayTour } from "@/components/mindmap/OnboardingTour";
 import { useAutosave } from "@/hooks/use-autosave";
-import { ToolProvider } from "@/hooks/use-tool-context";
+import { ToolProvider, useTool } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { BrainCircuit, Loader2 } from "lucide-react";
+
+/** Wrapper component inside ToolProvider that can use useTool */
+function FloatingToolbarWithCallbacks({ onOpenNodeEditor, onExpand }: { onOpenNodeEditor: () => void; onExpand: () => void }) {
+  const { setConnectingFrom, setTool } = useTool();
+  const handleConnectFrom = useCallback(() => {
+    setTool("connect");
+    setConnectingFrom(useMindMapStore.getState().selectedNodeIds[0] ?? null);
+  }, [setTool, setConnectingFrom]);
+  return (
+    <FloatingToolbar
+      onOpenNodeEditor={onOpenNodeEditor}
+      onExpand={onExpand}
+      onConnectFrom={handleConnectFrom}
+    />
+  );
+}
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -95,12 +112,32 @@ export default function Home() {
   // Autosave hook
   useAutosave();
 
-  const handleOpenNodeEditor = useCallback(() => setNodeEditorOpen(true), []);
-  const handleOpenAIPanel = useCallback(() => setAiPanelOpen(true), []);
+  const handleOpenNodeEditor = useCallback(() => {
+    setNodeEditorOpen(true);
+    setAiPanelOpen(false);
+    setSettingsOpen(false);
+    setExportOpen(false);
+  }, []);
+  const handleOpenAIPanel = useCallback(() => {
+    setAiPanelOpen(true);
+    setNodeEditorOpen(false);
+    setSettingsOpen(false);
+    setExportOpen(false);
+  }, []);
   const handleOpenSidebar = useCallback(() => setSidebarOpen(true), []);
-  const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+  const handleOpenSettings = useCallback(() => {
+    setSettingsOpen(true);
+    setNodeEditorOpen(false);
+    setAiPanelOpen(false);
+    setExportOpen(false);
+  }, []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
-  const handleOpenExport = useCallback(() => setExportOpen(true), []);
+  const handleOpenExport = useCallback(() => {
+    setExportOpen(true);
+    setNodeEditorOpen(false);
+    setAiPanelOpen(false);
+    setSettingsOpen(false);
+  }, []);
   const handleReplayTour = useCallback(() => {
     replayTour();
     setTourForceShow(true);
@@ -127,6 +164,9 @@ export default function Home() {
         {/* Theme manager */}
         <ThemeManager />
 
+        {/* Toast notifications */}
+        <ToastContainer />
+
         {/* Toolbar */}
         <Toolbar
           onOpenSettings={handleOpenSettings}
@@ -147,7 +187,7 @@ export default function Home() {
           />
 
           {/* Floating toolbar for selected node */}
-          <FloatingToolbar onOpenNodeEditor={handleOpenNodeEditor} />
+          <FloatingToolbarWithCallbacks onOpenNodeEditor={handleOpenNodeEditor} onExpand={handleOpenAIPanel} />
 
           {/* Minimap overlay */}
           {minimapEnabled && nodes.length > 0 && <Minimap />}
@@ -188,30 +228,42 @@ export default function Home() {
         <OnboardingTour forceShow={tourForceShow} />
 
         {/* Footer */}
-        <footer className="mt-auto border-t border-border px-4 py-2 bg-card/90 backdrop-blur-md">
+        <footer className="mt-auto border-t border-border/40 px-4 py-2.5 backdrop-blur-md"
+          style={{ background: "linear-gradient(90deg, color-mix(in srgb, var(--card) 85%, var(--muted)) 0%, var(--card) 50%, color-mix(in srgb, var(--card) 85%, var(--muted)) 100%)",
+        }}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="brand-gradient font-semibold shrink-0">Mapa Mental Complexo com IA</span>
-              <span className="hidden sm:inline shrink-0">·</span>
+              <span className="brand-gradient font-semibold shrink-0 text-sm">Mapa Mental Complexo com IA</span>
+              <span className="hidden sm:inline shrink-0 text-muted-foreground/40">·</span>
               <button
-                className="hidden sm:flex items-center gap-1 hover:text-primary transition-colors cursor-pointer shrink-0"
+                className="hidden sm:flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer shrink-0 px-2 py-1 rounded-md hover:bg-accent/40"
                 onClick={() => setCommandPaletteOpen(true)}
                 title="Abrir busca (Ctrl+K)"
               >
-                <kbd className="text-[10px] bg-muted px-1 py-0.5 rounded border border-border">Ctrl+K</kbd>
-                <span>buscar</span>
+                <kbd className="text-[10px] bg-muted/80 px-1.5 py-0.5 rounded border border-border/60 font-mono">Ctrl+K</kbd>
+                <span className="font-medium">Buscar</span>
+              </button>
+              <span className="hidden md:inline shrink-0 text-muted-foreground/40">·</span>
+              <button
+                className="hidden md:flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer shrink-0 px-2 py-1 rounded-md hover:bg-accent/40"
+                onClick={handleOpenShortcuts}
+                title="Atalhos de teclado"
+              >
+                <kbd className="text-[10px] bg-muted/80 px-1.5 py-0.5 rounded border border-border/60 font-mono">?</kbd>
+                <span className="font-medium">Atalhos</span>
               </button>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
-                className="hover:text-primary transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-accent/40 font-medium"
                 onClick={handleOpenExport}
                 title="Exportar"
               >
                 Exportar
               </button>
-              <span className="hidden sm:inline">·</span>
-              <span className="hidden sm:inline">Powered by Z.ai</span>
+              <span className="hidden sm:inline text-muted-foreground/40">·</span>
+              <span className="hidden sm:inline text-muted-foreground/70 font-medium">Powered by Z.ai</span>
             </div>
           </div>
         </footer>

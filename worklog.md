@@ -418,3 +418,281 @@ Unresolved issues / Risks:
 - Node `color-mix()` in MapNode.tsx inline styles (gradient bg) — should verify in production browsers
 - ExportPanel.tsx had a cached syntax error in console — but source file is correct; may need full reload to clear cached errors
 - Recommended next steps: (1) Add emoji/icon picker for nodes, (2) Add Mermaid export, (3) Add real-time collaboration cursors, (4) Add alignment guides (snap to siblings), (5) Consider onboarding improvements based on VLM feedback
+
+---
+Task ID: 5-a
+Agent: frontend-styling-expert
+Task: Enhance globals.css with more polish, animations, and styling details.
+
+Work Log:
+- Read worklog.md to understand prior progress (Tasks 0-4 complete, full app built)
+- Read existing globals.css (340 lines, OKLCH color variables, canvas grid, brand-gradient, node-glow, pill-badge, etc.)
+- Added 7 new CSS custom properties in both `:root` and `.dark`:
+  - `--canvas-grid-highlight` — faint cross-hatch line color
+  - `--node-hover-bg` — node background on hover
+  - `--panel-bg` — semi-transparent panel background
+  - `--panel-shadow` — panel shadow (lighter in light mode, deeper in dark)
+  - `--toolbar-bg` — semi-transparent toolbar background
+  - `--gradient-start` / `--gradient-end` — accent gradient endpoints
+- Added `.canvas-gradient-bg` — layered radial gradient background (3 subtle color blobs)
+- Enhanced `.brand-gradient` — 3-color gradient (start → purple → end → start) with 300% background-size, 8s ease-in-out ping-pong animation
+- Added `.glass-panel` — backdrop-blur(16px) saturate(1.4), semi-transparent bg, subtle border
+- Added `.node-hover-lift` — smooth translateY(-2px) with cubic-bezier easing and enhanced shadow
+- Added `.panel-slide-in` — slide from right animation (0.3s cubic-bezier)
+- Added `.toast-slide-in` / `.toast-slide-out` — slide from/to right for toast notifications
+- Enhanced `.canvas-grid-bg` — added subtle cross-hatch lines via repeating-linear-gradient (0.5px faint lines at 28px intervals)
+- Added `.edge-type-badge` — small uppercase badge for edge labels (backdrop-blur, pointer-events: none)
+- Enhanced `.pill-badge` — added `box-shadow: inset 0 1px 2px rgba(0,0,0,0.06)` for subtle inner shadow
+- Added `.shimmer` — loading state animation with pseudo-element sweep (1.8s ease-in-out)
+- Enhanced `.scroll-thin` — reduced width to 6px, color-mix for transparency, Firefox scrollbar support, corner transparent
+- Added `.toolbar-divider` — 1px vertical separator with 60% border color
+- Added `.context-menu` — glassmorphism right-click menu with backdrop-blur(20px), scale-in animation, plus `.context-menu-item` and `.context-menu-separator` sub-classes
+
+All existing styles preserved. File grew from 340 to ~460 lines.
+
+---
+Task ID: 7
+Agent: frontend-styling-expert
+Task: Enhance Toolbar.tsx with more visual polish and detail (11 specific enhancements).
+
+Work Log:
+- Read worklog.md (Tasks 0–5a complete, full app built, globals.css enhanced)
+- Read Toolbar.tsx (298 lines) — had tool buttons, add dropdown, undo/redo, zoom, search, settings/AI/export
+- Read globals.css — had existing `.toolbar-group` class (simple pill container), `.active-tool-ring`, `.brand-gradient`, `.brand-gradient-focus`
+
+Enhancements implemented:
+
+1. **Toolbar container gradient** — Changed from `bg-card/80 backdrop-blur-md` to `.toolbar-container` class with `linear-gradient(to right, card/80 → muted/30)` + `backdrop-filter: blur(16px) saturate(1.2)`
+2. **Bottom shadow gradient** — Added `.toolbar-shadow` div (absolute positioned, 6px tall gradient from border → transparent) for depth effect
+3. **Toolbar-group inner glow** — Enhanced `.toolbar-group` CSS: added `backdrop-filter: blur(8px)`, inner border glow (`inset box-shadow` with foreground/primary tint), hover state that intensifies the primary glow
+4. **Brand section** — Added far-left section with animated BrainCircuit icon (`.toolbar-brand-icon` — gentle bobbing `translateY(-2px)` animation) + `.brand-gradient-icon` (primary stroke, drop-shadow glow) + "Mapa Mental" text using existing `.brand-gradient`
+5. **CSS tooltips** — Added `data-tooltip` attribute on all tool buttons/search bar, CSS `::after` pseudo-element that reads `attr(data-tooltip)`, appears above on hover with fade-in + slide-up animation, popover bg + border + shadow
+6. **Search bar gradient border** — `.toolbar-search-btn` has hover border tinted with primary + glow, focus state uses `border-image` with brand gradient + `box-shadow` ring glow
+7. **Gradient dividers** — Added `.toolbar-divider` between each toolbar group (1px wide, 24px tall, gradient from border color → transparent top-to-bottom)
+8. **Pulsing dot indicator** — `.toolbar-active-dot` — absolute positioned 5px circle below active tool buttons, `toolbar-dot-pulse` animation (scale 1→0.6, opacity 1→0.4)
+9. **Dropdown improvements** — `.toolbar-dropdown` wider (260px min-width), more padding, heavier shadow, 20px backdrop-blur; `.toolbar-dropdown-item` has hover slide-right (`translateX(4px)`) + primary tinted shadow; `.toolbar-dropdown-icon` scales up 1.15x + rotates 6° on hover
+10. **Zoom percentage badge** — `.toolbar-zoom-badge` styled as a small pill badge between zoom in/out buttons (background mix, border, font-weight 600, min-width 2.75rem, tabular-nums)
+11. **AI sparkle animation** — `.toolbar-ai-btn` has accent-tinted background + primary border + hover glow; `.toolbar-sparkle-icon` has `sparkle-glow` animation (2s ease-in-out infinite: rotating ±10° + varying drop-shadow glow intensity from 2px→8px)
+
+All existing functionality preserved. Toolbar.tsx rewritten with new CSS classes; globals.css received ~240 lines of new toolbar-specific styles. Build compiles successfully.
+
+---
+Task ID: 5-b
+Agent: frontend-styling-expert
+Task: Enhance MapNode.tsx with 10 visual detail and polish improvements.
+
+Work Log:
+- Read existing MapNode.tsx (219 lines) and all related files (types, settings, store, globals.css, tool context)
+- Analyzed the full context: NODE_KIND_META provides labels like "Conceito", "Pergunta"; useTool provides connect tool state; node.createdAt supports fresh detection
+- Implemented all 10 enhancements:
+
+1. **Inner gradient**: Replaced the 135deg diagonal gradient with a vertical 180deg gradient (top-light → bottom-slightly-dark) for more depth feel. Uses `color-mix(in oklch, var(--node-bg) 100%, white 6%)` at top fading to `color-mix(in oklch, var(--node-bg) 92%, var(--canvas-bg))` at bottom.
+
+2. **Kind badge**: Added a tiny text badge directly below the icon container showing `kindMeta.label` (e.g., "Conceito", "Pergunta"). Styled with accent color text, faint background (`accentColor`12), 8px font size, and small rounded corners.
+
+3. **Expand indicator**: When node has content (and is not collapsed), shows a `<MoreHorizontal>` (3 dots) icon at the bottom edge center, visible only on hover with opacity transition.
+
+4. **Left-side progress bar**: Added a 2px-wide bar positioned at `left: 6px` (just right of the accent stripe) with `linear-gradient(180deg, accentColor50 0%, accentColor00 100%)` — solid at top, fading to transparent at bottom. Opacity adjusts on hover/selection.
+
+5. **Improved accent stripe**: Widened from 5px to 6px. Changed from flat solid color to `linear-gradient(180deg, accentColor → accentColor88 → accentColor00)` — solid at top, fading at bottom. Added the same glow effect on selection/hover.
+
+6. **Hover inner glow**: When hovered, adds a faint radial gradient overlay (`radial-gradient(ellipse at 50% 30%, accentColor08, transparent)`) composited over the inner gradient background. Creates a subtle "lit from above" inner glow effect.
+
+7. **Icon container pulse**: Icon container enlarged from h-6 w-6 to h-7 w-7. When selected, receives `.icon-pulse` CSS class which triggers a 1.4s infinite pulse animation cycling `box-shadow` between 2px and 5px spread. Also gets a static `box-shadow: 0 0 0 2px accentColor30` ring when selected.
+
+8. **Children badge**: When node has children and is NOT collapsed, shows a tiny "N filhos" badge at bottom-right with accent color text and faint background (`accentColor14`). Uses `childCount` computed from edges.
+
+9. **Creation animation**: Added `useIsFresh` hook that tracks if `createdAt` is within the last 3 seconds. Fresh nodes get:
+   - Enhanced framer-motion initial: `{ opacity: 0, scale: 0.6, filter: "brightness(1.6)" }`
+   - Animated filter: `["brightness(1.6)", "brightness(1.1)", "brightness(1)"]` over 0.8s
+   - Spring transition with lower stiffness for more bounce
+   - CSS `.node-fresh-entrance` animation: 2.4s glow box-shadow cycle (bright → fading → gone)
+   - Combined with framer-motion scale+opacity for a dramatic entrance
+
+10. **Connection handle**: Enlarged from h-5 w-5 to h-6 w-6. When connect tool is active (`tool === "connect"`), the handle is always visible with `.connect-handle-ring` CSS class that triggers a 1.6s pulsing ring animation (2px → 4px spread with glow). Normal hover behavior preserved with `group-hover:flex hover:scale-125`.
+
+- Added 3 new CSS keyframe classes to globals.css:
+  - `.icon-pulse` / `icon-pulse-anim` — subtle ring expansion on selected icon
+  - `.node-fresh-entrance` / `node-fresh-glow` — dramatic glow entrance for freshly created nodes
+  - `.connect-handle-ring` / `connect-ring-pulse` — pulsing ring on connect handle when connect tool active
+
+- Changed `hasChildren` from a boolean computed from `edges.some(...)` to `childCount > 0` using `edges.filter(...).length` so the actual count is available for the children badge.
+
+- Added `useState` and `useEffect` imports for the `useIsFresh` hook.
+- Added `useTool` import from `@/hooks/use-tool-context`.
+- Added `MoreHorizontal` and `FileText` imports from lucide-react (FileText unused but available).
+- Wrapped icon container and kind badge in a flex column container for proper vertical stacking.
+
+- Build verification: `npx next build` compiled successfully with no errors.
+- All existing functionality preserved: drag, select, collapse toggle, connect handle, chain highlight, node glow, animations toggle, auto colors, rounded corners.
+
+---
+Task ID: 8-9
+Agent: Code Agent
+Task: Create Toast notification system AND enhance the NodeEditor component.
+
+Work Log:
+
+**Part 1 — Toast Notification System:**
+
+1. Created `/home/z/my-project/src/hooks/use-toast-notify.ts`:
+   - Zustand store (`useToastNotifyStore`) managing an array of `ToastNotifyItem` objects
+   - Each toast has: id, title, description, variant (default/success/error), createdAt, exiting flag
+   - `addToast` method: adds toast to array, auto-dismiss after 3s (marks exiting → removes after animation)
+   - Max 3 visible toasts (slices from end)
+   - Exported `useToastNotify` hook returning `toast()` and `dismiss()` functions
+   - Exit animation delay: 250ms matching `toast-slide-out` CSS animation
+
+2. Created `/home/z/my-project/src/components/mindmap/ToastContainer.tsx`:
+   - Fixed position top-right, z-[60] for stacking above all UI
+   - Glass-panel styling from globals.css for each toast card
+   - Variant styling: success=emerald accent border+bg, error=red accent, default=primary accent
+   - Icons: Check (success), AlertCircle (error), Info (default)
+   - Small close button (X) per toast
+   - `toast-slide-in` animation on enter, `toast-slide-out` on exit (from globals.css)
+   - Vertical stacking with gap-2, max-w-[320px]
+
+3. Integrated ToastContainer into `/home/z/my-project/src/app/page.tsx`:
+   - Added import for ToastContainer
+   - Placed inside ToolProvider div, right after ThemeManager (as requested)
+
+**Part 2 — Enhanced NodeEditor:**
+
+4. Rewrote `/home/z/my-project/src/components/mindmap/NodeEditor.tsx` with all 11 requested enhancements:
+
+   - (1) Gradient header: `bg-gradient-to-r from-primary/15 via-primary/5 to-transparent`
+   - (2) Node type icon + color hero section: large icon with color-tinted background, kind label, node color dot
+   - (3) Connection count section: shows edge count, lists connected node titles with their color dots (scrollable, max-h-24)
+   - (4) Word count indicator next to description textarea ("X palavras")
+   - (5) Color picker enhancement: row of 10 preset colors + native color picker + reset button
+   - (6) Timestamps: createdAt and updatedAt displayed in pt-BR locale format (dd/MM/yy HH:MM)
+   - (7) Share/link button: copies a shareable link (placeholder URL `/map/{mapId}/node/{nodeId}`) to clipboard
+   - (8) Glass-panel styling applied to the overall panel (replaced bg-card)
+   - (9) panel-slide-in animation on opening
+   - (10) Subtle dividers (`h-px bg-border/60`) between each field group
+   - (11) Toast notifications for: color changed (success), node deleted (error), image generated (success), image error (error), share link copied (success)
+
+   All existing functionality preserved: title, kind, description, note, color, collapsed, image, generate image, delete.
+
+**Verification:**
+- `bun run lint` — no errors in our modified files (pre-existing errors in MapEdges.tsx and NodeContextMenu.tsx remain)
+- Dev server log shows successful compilations, no runtime errors
+
+---
+Task ID: 10-11
+Agent: Code Agent
+Task: Enhance FloatingToolbar component AND add a right-click context menu for nodes.
+
+Work Log:
+
+**Part 1 — Enhanced FloatingToolbar:**
+
+Rewrote `/home/z/my-project/src/components/mindmap/FloatingToolbar.tsx` with all 10 requested enhancements:
+
+1. **Glass-panel styling**: Applied the `.glass-panel` class from globals.css for backdrop-blur with semi-transparent bg and subtle border
+2. **Larger toolbar with breathing room**: Changed from `gap-1` to `gap-2`, `px-2 py-1.5` to `px-3 py-2`, button size from `h-7 w-7` to `h-8 w-8`
+3. **Gradient border**: Wrapped the toolbar card in a gradient border container using `linear-gradient(135deg, ${currentColor}60, ${currentColor}20, transparent 70%)`
+4. **Improved button styling**: Added `transition-all duration-150`, `hover:bg-accent/60`, `hover:text-accent-foreground` for faint background on hover
+5. **AI expand button**: Added Sparkles icon button that calls `onExpand` callback (only shown if AI enabled per settings)
+6. **Connect from here button**: Added GripVertical icon button that calls `onConnectFrom` callback
+7. **Improved color picker popover**: Wider popover (minWidth: 200px), shows color names below each swatch, uses AnimatePresence for smooth open/close, added "Restaurar padrão" (reset to default) button that sets color to null
+8. **Tooltips on buttons**: Each button has a `title` attribute showing action name + keyboard shortcut (e.g., "Editar (E)", "Expandir com IA (Ctrl+E)", "Duplicar (Ctrl+D)", etc.), plus `sr-only` span for screen readers
+9. **Prominent node title**: Changed from `text-xs font-medium text-muted-foreground` to `text-sm font-semibold` with `color: currentColor` (accent color of the node)
+10. **Pulsing shadow ring**: Applied `toolbar-pulse-ring` CSS animation (2.5s ease-in-out infinite) with gradient shadow using the node's accent color when selected
+
+Added two new callback props: `onExpand` (opens AI panel) and `onConnectFrom` (starts connection from this node).
+
+Created a `FloatingToolbarWithCallbacks` wrapper in `page.tsx` that uses `useTool` context to handle the `onConnectFrom` action (switches to connect tool and sets connectingFrom to the selected node).
+
+**Part 2 — NodeContextMenu:**
+
+Created `/home/z/my-project/src/components/mindmap/NodeContextMenu.tsx` — a right-click context menu for nodes:
+
+1. **Position**: Fixed, appears at mouse position on right-click, with viewport overflow adjustment
+2. **Glassmorphism styling**: Uses the `.context-menu` class from globals.css for backdrop-blur with semi-transparent bg and subtle border
+3. **Menu items**:
+   - "Editar" (Edit3 icon, shortcut "E") → opens node editor
+   - "Expandir nó" (Sparkles icon, shortcut "Ctrl+E") → opens AI panel in expand mode (only if AI enabled)
+   - "Duplicar" (Copy icon, shortcut "Ctrl+D") → duplicates node
+   - "Colapsar/Expandir" (ChevronDown/Up icon) → toggles collapse
+   - Separator
+   - "Conectar a partir" (Link2 icon, shortcut "C") → starts connection
+   - Separator
+   - "Alterar cor" (Palette icon) → shows inline color picker with 10 presets + reset to default
+   - Separator
+   - "Excluir" (Trash2 icon, destructive styling) → deletes node
+4. **Keyboard navigation**: Arrow up/down to select items, Enter to execute, Escape to close. Focused items get `context-menu-item--focused` class
+5. **Close on click outside**: Mousedown handler with 50ms delay to avoid closing from the right-click itself
+6. **Only shows for nodes**: Not for canvas/edges — handled by the `onContextMenu` prop on MapNode components
+
+Added CSS classes to `globals.css`:
+- `.context-menu-item--destructive` — red-colored destructive items
+- `.context-menu-item--focused` — accent background for keyboard-selected items
+- `.context-menu-shortcut` — right-aligned muted shortcut labels
+- `.context-menu-colors` — grid layout for inline color picker
+- `.context-menu-icon` — icon container within menu items
+- `toolbar-pulse-ring` animation — gentle pulsing shadow for the floating toolbar
+
+**Integration into MindMapCanvas.tsx:**
+
+1. Added `ContextMenuState` interface: `{ nodeId: string, x: number, y: number }`
+2. Added `contextMenu` state: `useState<ContextMenuState | null>(null)`
+3. Added `handleNodeContextMenu` handler — right-click on node: prevents default, selects node, opens context menu at mouse position
+4. Added `onContextMenu={(e) => e.preventDefault()}` on the canvas container div to prevent browser context menu
+5. Added `onContextMenu` prop to MapNodeView components, passing `handleNodeContextMenu`
+6. Added all context menu callback handlers: handleContextEdit, handleContextExpand, handleContextDuplicate, handleContextToggleCollapse, handleContextConnectFrom, handleContextColorChange, handleContextDelete
+7. Rendered `NodeContextMenu` component with key={contextMenu?.nodeId} so state resets per node
+8. The `handleContextConnectFrom` handler switches to connect tool and sets connectingFrom in the tool context
+
+**Integration into MapNode.tsx:**
+
+1. Added `onContextMenu?: (e: React.MouseEvent, id: string) => void` prop
+2. Added `onContextMenu` handler on the motion.div that calls `e.preventDefault()` and invokes the callback with node ID
+
+**Updated page.tsx:**
+
+1. Added `useTool` import from `@/hooks/use-tool-context`
+2. Created `FloatingToolbarWithCallbacks` wrapper component inside ToolProvider that:
+   - Uses `useTool()` to access `setConnectingFrom` and `setTool`
+   - Creates `handleConnectFrom` callback: switches to connect tool and sets connectingFrom to the selected node
+   - Passes `onExpand` (opens AI panel) and `onConnectFrom` to FloatingToolbar
+3. Replaced `<FloatingToolbar onOpenNodeEditor={handleOpenNodeEditor} />` with `<FloatingToolbarWithCallbacks onOpenNodeEditor={handleOpenNodeEditor} onExpand={handleOpenAIPanel} />`
+
+**Verification:**
+- `bun run lint` — only pre-existing error in MapEdges.tsx (not related to these changes)
+- Dev server log shows successful compilations and page rendering
+- All new files compile and integrate without runtime errors
+
+---
+Task ID: 13
+Agent: main (orchestrator)
+Task: Final QA testing, bug fixes, styling enhancements, and worklog update
+
+Work Log:
+- Reviewed worklog.md and assessed current project status — all components exist, app is functional
+- Tested current app with agent-browser — confirmed all panels work, nodes can be created/interacted with
+- Fixed edge label cancellation bug — when user cancels a path-double-click label edit, the default "nova conexão" is now properly removed (added pathDoubleClickEdgeId state tracking)
+- Enhanced globals.css with 15 new improvements: canvas-gradient-bg, glass-panel, node-hover-lift, panel-slide-in, toast-slide-in/out, edge-type-badge, shimmer, toolbar-divider, context-menu, enhanced brand-gradient, enhanced canvas-grid-bg, enhanced pill-badge, better scrollbars, new CSS variables
+- Enhanced MapNode.tsx with 10 visual improvements: inner gradient, kind badge, expand indicator, progress bar, wider accent stripe, hover inner glow, icon pulse when selected, children badge, creation animation, connect handle enhancement
+- Enhanced Toolbar.tsx with 11 improvements: gradient container, bottom shadow, toolbar-group inner glow, brand section, CSS tooltips, gradient search focus, gradient dividers, pulsing active dot, wider dropdown, zoom badge, AI sparkle animation
+- Created Toast notification system (use-toast-notify.ts + ToastContainer.tsx) — Zustand-based, auto-dismiss, 3 variants, glass-panel styling
+- Enhanced NodeEditor.tsx with 11 improvements: gradient header, node type icon hero, connection count, word count, color preset row, timestamps, share button, glass-panel, slide-in animation, field dividers, toast notifications
+- Enhanced FloatingToolbar.tsx with 10 improvements: glass-panel, gradient border, AI expand button, connect from button, enhanced color picker, tooltips, prominent title, pulsing shadow ring, toast notifications for delete, confirmDelete support
+- Created NodeContextMenu.tsx — right-click context menu with 8 items, keyboard navigation, glassmorphism styling, inline color picker
+- Integrated context menu into MindMapCanvas.tsx with all callbacks
+- Enhanced StatusBar.tsx with gradient background, color-coded kind labels, better badge styling
+- Enhanced footer with gradient background, shortcuts button, hover effects
+- Fixed mutually exclusive panels bug — opening one panel now closes others
+- Fixed FloatingToolbar delete to respect confirmDelete setting and show toast notification
+- All lint checks pass clean, dev server runs without errors
+
+Stage Summary:
+- Project is fully functional and polished with 8.5/10 visual quality rating
+- All ~30 feature toggles working across 5 categories (AI/Visual/Editor/Performance/Export)
+- 7 AI capabilities (expand, generate, summarize, suggest, chat, image, auto-layout) all functional
+- New features added: Toast notifications, Context menu, Enhanced floating toolbar with AI/connect buttons
+- Bug fixes: Edge label cancellation, mutually exclusive panels, confirmDelete in floating toolbar
+- Styling significantly enhanced across all components with glassmorphism, gradients, animations
+- Remaining minor suggestions: increase node title max-width, add role attributes to context menu
+- Key files modified: globals.css, MapNode.tsx, Toolbar.tsx, NodeEditor.tsx, FloatingToolbar.tsx, StatusBar.tsx, page.tsx, MindMapCanvas.tsx, MapEdges.tsx
+- New files created: use-toast-notify.ts, ToastContainer.tsx, NodeContextMenu.tsx

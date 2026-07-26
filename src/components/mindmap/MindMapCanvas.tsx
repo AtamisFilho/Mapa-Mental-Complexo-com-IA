@@ -10,6 +10,13 @@ import { NODE_KIND_META } from "@/lib/settings";
 import type { NodeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
+import { NodeContextMenu } from "./NodeContextMenu";
+
+interface ContextMenuState {
+  nodeId: string;
+  x: number;
+  y: number;
+}
 
 interface Props {
   onOpenNodeEditor: () => void;
@@ -32,7 +39,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     vpStartY: number;
   } | null>(null);
 
-  const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld } = useTool();
+  const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld, setTool } = useTool();
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const nodes = useMindMapStore((s) => s.nodes);
   const edges = useMindMapStore((s) => s.edges);
@@ -49,6 +59,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const deleteNode = useMindMapStore((s) => s.deleteNode);
   const duplicateNode = useMindMapStore((s) => s.duplicateNode);
   const selectNodes = useMindMapStore((s) => s.selectNode);
+  const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
   const multiSelect = useSettingsStore((s) => s.settings.editor.multiSelect);
 
   const showGrid = useSettingsStore((s) => s.settings.visual.grid);
@@ -124,6 +135,78 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       setCursorWorld(null);
     },
     [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld, multiSelect]
+  );
+
+  // Node right-click handler — open context menu
+  const handleNodeContextMenu = useCallback(
+    (e: React.MouseEvent, id: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectNodes(id, false);
+      setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
+    },
+    [selectNodes]
+  );
+
+  // Context menu callbacks
+  const handleContextEdit = useCallback(
+    (nodeId: string) => {
+      selectNodes(nodeId, false);
+      onOpenNodeEditor();
+    },
+    [selectNodes, onOpenNodeEditor]
+  );
+
+  const handleContextExpand = useCallback(
+    (nodeId: string) => {
+      selectNodes(nodeId, false);
+      onOpenAIPanel();
+    },
+    [selectNodes, onOpenAIPanel]
+  );
+
+  const handleContextDuplicate = useCallback(
+    (nodeId: string) => {
+      pushHistory();
+      duplicateNode(nodeId);
+    },
+    [pushHistory, duplicateNode]
+  );
+
+  const handleContextToggleCollapse = useCallback(
+    (nodeId: string) => {
+      toggleCollapse(nodeId);
+    },
+    [toggleCollapse]
+  );
+
+  const handleContextConnectFrom = useCallback(
+    (nodeId: string) => {
+      selectNodes(nodeId, false);
+      setTool("connect");
+      setConnectingFrom(nodeId);
+    },
+    [selectNodes, setTool, setConnectingFrom]
+  );
+
+  const handleContextColorChange = useCallback(
+    (nodeId: string, color: string | null) => {
+      pushHistory();
+      if (color !== null) {
+        updateNode(nodeId, { color });
+      } else {
+        updateNode(nodeId, { color: null });
+      }
+    },
+    [pushHistory, updateNode]
+  );
+
+  const handleContextDelete = useCallback(
+    (nodeId: string) => {
+      pushHistory();
+      deleteNode(nodeId);
+    },
+    [pushHistory, deleteNode]
   );
 
   // Node pointer down — start drag or connect
@@ -447,6 +530,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       onPointerUp={handlePointerUp}
       onWheel={handleWheel}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {/* transform layer */}
       <div
@@ -473,6 +557,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
               node={node}
               onPointerDown={handleNodePointerDown}
               onConnectHandle={handleConnectHandle}
+              onContextMenu={handleNodeContextMenu}
               isHighlighted={highlightedNodeIds.has(node.id)}
             />
           ))}
@@ -544,6 +629,20 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
           </div>
         </div>
       )}
+
+      {/* Node context menu */}
+      <NodeContextMenu
+        key={contextMenu?.nodeId ?? "none"}
+        menuState={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onEdit={handleContextEdit}
+        onExpand={handleContextExpand}
+        onDuplicate={handleContextDuplicate}
+        onToggleCollapse={handleContextToggleCollapse}
+        onConnectFrom={handleContextConnectFrom}
+        onColorChange={handleContextColorChange}
+        onDelete={handleContextDelete}
+      />
     </div>
   );
 }
