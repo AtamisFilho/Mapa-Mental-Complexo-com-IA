@@ -1782,3 +1782,72 @@ Stage Summary:
 - **Constraints honored**: No new page routes (only `/`), no mini-services modifications, no package.json changes, `import { db } from '@/lib/db'` used throughout, `z-ai-web-dev-sdk` not touched, Portuguese (pt-BR) UI labels throughout.
 - **Lint status**: 0 errors, 0 warnings ✓
 - **Dev server**: Running on port 3000 (restarted to pick up Prisma schema change), HTTP 200 ✓
+
+---
+Task ID: 9-D / 9-E / 9-final
+Agent: main (orchestrator)
+Task: Round 9 — node text readability, code-splitting, collab integration, QA, commit/push/PR.
+
+Work Log:
+- Installed `socket.io-client@4.8.3` in main project for the collab hook.
+- **9-D — Node text readability:**
+  - MapNode.tsx: title 14px bold → 15px semibold + `.node-title-text` class; description 12px @0.88 opacity → 12.5px @ foreground/75 + `.node-desc-text` class
+  - globals.css: added `.node-title-text` and `.node-desc-text` with `color-mix(in srgb, var(--background) 55%, transparent)` text-shadow. Initial placement at line 654 was NOT compiled by Tailwind 4 (cause unknown — possibly a CSS processing quirk late in the file). Moved rules to line 242 (right after `.node-glow`, a known-working custom class) → compiled correctly.
+  - Verified via agent-browser computed styles: `text-shadow: color(srgb 0.02 0.05 0.04 / 0.55) 0px 1px 2px`, `font-size: 15px`, `font-weight: 600` ✓
+
+- **9-E — Code-splitting + collab integration in page.tsx:**
+  - Converted 12 heavy panels to `next/dynamic` with `ssr:false`: Sidebar, NodeEditor, AIPanel, SettingsPanel, ShortcutsPanel, ExportPanel, CommandPalette, OnboardingTour, SearchPanel, TemplatesPanel, ShareDialog, RemoteCursors
+  - Added `PanelSkeleton` loading fallback (Loader2 spinner) for panel chunks
+  - Wired `useCollab(mapId, enabled)` hook — only active when `!readOnly && collabEnabled`
+  - Rendered `<RemoteCursors>` overlay on canvas when collab is enabled and remote cursors exist
+
+- **CRITICAL BUG FIX — Infinite refetch loop in ShareDialog:**
+  - Root cause: `useToastNotify` returned new `toast`/`dismiss` function refs on every render (inline arrow functions in the return statement). This destabilized `useCallback(fetchShare, [mapId, toast])` → `useEffect([open, mapId, fetchShare])` → infinite refetch loop (verified: 15+ identical GET /api/maps/.../share requests in <1s).
+  - Fix: memoized `toast` and `dismiss` with `useCallback`, wrapped return object with `useMemo`. Now stable across renders.
+  - This was a latent bug affecting ALL consumers of `useToastNotify` — fixing it at the source prevents future occurrences.
+
+- **QA via agent-browser:**
+  - Initial load: HTTP 200, page renders, toolbar visible with new "Partilhar mapa" button ✓
+  - Share dialog: single GET request (no loop after fix), toggle checked, URL input shows `http://localhost:81/?share=16a655f2...`, Copy + Regenerar buttons present ✓
+  - Read-only share view (`/?share=16a655f2...`): "Modo de visualização (apenas leitura)" banner present, only "Sair" button + minimap interactive, all editing UI hidden ✓
+  - Exit button: clears `?share=` param, returns to editor mode ✓
+  - Collab toggle: found in Settings → Editor → "Colaboração em tempo real", switch toggled false→true ✓
+  - Collab service: `curl http://localhost:3003/socket.io/?EIO=4&transport=polling` returns valid handshake `{"sid":"...","upgrades":["websocket"]}` ✓
+  - Node titles: 20 `.node-title-text` elements, 20 `.node-desc-text` elements, computed font-size 15px, font-weight 600, text-shadow applied ✓
+
+- **Lint:** `bun run lint` → 0 errors, 0 warnings ✓
+
+- **Git operations:**
+  - Configured remote with PAT: `https://x-access-token:ghp_***@github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA.git`
+  - Created feature branch: `feat/round9-share-collab-codeplitting`
+  - Committed Round 9 changes (23 files, +2400/-127 lines): `ae26a49`
+  - Merged `origin/main` (unrelated histories) to establish common ancestor for PR: `026ad94`
+  - Pushed feature branch to GitHub (force push with explicit refspec was needed — `git push -u` silently failed)
+  - Created PR #1 via GitHub API: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/pull/1
+    - 15 commits, 276 changed files, 48,925 additions, 0 deletions
+    - Base: main ← Head: feat/round9-share-collab-codeplitting
+
+Stage Summary:
+- **Round 9 complete.** 4 new features delivered:
+  1. Read-only share links (Prisma shareId + 3 API routes + ShareDialog + read-only canvas mode)
+  2. Real-time collaboration (socket.io mini-service on :3003 + useCollab hook + RemoteCursors)
+  3. Code-splitting (12 panels → next/dynamic ssr:false, reduces initial bundle + OOM relief)
+  4. Node text readability (15px semibold titles + text-shadow, 12.5px descriptions with better contrast)
+- **1 critical bug fixed:** useToastNotify unstable refs causing infinite refetch loops
+- **PR #1 created:** https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/pull/1
+- **Lint:** 0 errors ✓
+- **Dev server:** running on :3000, HTTP 200 ✓
+- **Collab service:** running on :3003, socket.io handshake OK ✓
+
+Unresolved issues / Risks:
+- Sandbox OOM-kill: still intermittent with dev server + collab service running simultaneously
+- Pre-existing tsc errors (MapEdges foreignObject, NodeEditor icon style) — not blocking, ignoreBuildErrors=true
+- Collab mini-service roster is in-memory only (lost on restart) — acceptable for dev, would need Redis/DB for production
+- Remote cursors only render when 2+ users are on the same map — single-user testing can't fully verify cursor animation
+
+Recommended next steps:
+1. Merge PR #1 into main
+2. Smart orthogonal edge routing (replace bezier with elbow connectors)
+3. Node-level permissions / multi-user edit conflict resolution
+4. Persistent collab roster (Redis adapter for socket.io)
+5. Versioned map history (snapshots on save)
