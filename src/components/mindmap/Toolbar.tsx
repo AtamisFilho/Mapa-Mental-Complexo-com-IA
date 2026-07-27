@@ -22,11 +22,6 @@ import {
   Edit3,
   Copy,
   LayoutGrid,
-  GitBranch,
-  Network,
-  CircleDot,
-  Workflow,
-  ScanLine,
   Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,11 +29,6 @@ import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
 import { NODE_KIND_META } from "@/lib/settings";
-import {
-  LAYOUT_LABELS,
-  LAYOUT_DESCRIPTIONS,
-  type LayoutType,
-} from "@/lib/layout-algorithms";
 import type { NodeKind } from "@/lib/types";
 
 interface Props {
@@ -50,6 +40,10 @@ interface Props {
   onOpenSearch: () => void;
   onOpenNodeEditor: () => void;
   onOpenShare: () => void;
+  /** Optional: parent hook fired when the layout panel button is clicked
+   *  (e.g. to close other right-side panels via mutual exclusion). When not
+   *  provided, the Toolbar manages the LayoutPanel open-state internally. */
+  onOpenLayout?: () => void;
 }
 
 // Keyboard shortcut tooltip map
@@ -81,16 +75,13 @@ function ToolTipBadge({ shortcut }: { shortcut: string }) {
   );
 }
 
-export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor, onOpenShare }: Props) {
+export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor, onOpenShare, onOpenLayout }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
-  const layoutMenuRef = useRef<HTMLDivElement>(null);
   const { tool, setTool } = useTool();
   const zoomBy = useMindMapStore((s) => s.zoomBy);
   const resetViewport = useMindMapStore((s) => s.resetViewport);
   const fitToView = useMindMapStore((s) => s.fitToView);
-  const applyLayout = useMindMapStore((s) => s.applyLayout);
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const past = useMindMapStore((s) => s.past);
@@ -133,33 +124,17 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
     duplicateNode(selectedNodeIds[0]);
   }, [selectedNodeIds, duplicateNode, pushHistory]);
 
-  const handleSelectLayout = useCallback(
-    (type: LayoutType, thenFit: boolean) => {
-      applyLayout(type);
-      setLayoutMenuOpen(false);
-      if (thenFit) {
-        // Defer to next tick so the new positions are committed before fit.
-        setTimeout(() => fitToView(80), 0);
-      }
-    },
-    [applyLayout, fitToView]
-  );
-
-  // Close menus on outside click / Escape
+  // Close add-menu on outside click / Escape
   useEffect(() => {
-    if (!addMenuOpen && !layoutMenuOpen) return;
+    if (!addMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
         setAddMenuOpen(false);
-      }
-      if (layoutMenuRef.current && !layoutMenuRef.current.contains(e.target as Node)) {
-        setLayoutMenuOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setAddMenuOpen(false);
-        setLayoutMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", onDown);
@@ -168,7 +143,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [addMenuOpen, layoutMenuOpen]);
+  }, [addMenuOpen]);
 
   const toolButtons: Array<{ toolId: string; icon: React.ReactNode; label: string; shortcut: string }> = [
     { toolId: "select", icon: <MousePointer2 className="h-4 w-4" />, label: "Selecionar", shortcut: SHORTCUT_MAP.select },
@@ -305,62 +280,19 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => fitToView(80)} data-tooltip={`Ajustar à tela (${SHORTCUT_MAP.fitToView})`}>
           <Maximize className="h-4 w-4" />
         </Button>
-        {/* Layout dropdown — 4 auto-layout algorithms + fit-to-view */}
-        <div className="relative" ref={layoutMenuRef}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 transition-colors toolbar-btn"
-            onClick={() => setLayoutMenuOpen(!layoutMenuOpen)}
-            data-tooltip="Organizar layout"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          {layoutMenuOpen && (
-            <div className="absolute top-full right-0 mt-1.5 z-[100] toolbar-dropdown fade-in">
-              <p className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Organizar layout</p>
-              {(
-                [
-                  { type: "tree-horizontal" as LayoutType, icon: <GitBranch className="h-3.5 w-3.5" />, desc: "horizontal" },
-                  { type: "tree-vertical" as LayoutType, icon: <Workflow className="h-3.5 w-3.5" />, desc: "vertical" },
-                  { type: "radial" as LayoutType, icon: <Network className="h-3.5 w-3.5" />, desc: "radial" },
-                  { type: "organic" as LayoutType, icon: <CircleDot className="h-3.5 w-3.5" />, desc: "organic" },
-                ]
-              ).map((opt) => (
-                <button
-                  key={opt.type}
-                  className="toolbar-dropdown-item"
-                  onClick={() => handleSelectLayout(opt.type, false)}
-                >
-                  <div className="toolbar-dropdown-icon" aria-hidden>
-                    {opt.icon}
-                  </div>
-                  <div className="flex flex-col items-start min-w-0">
-                    <span className="font-medium">{LAYOUT_LABELS[opt.type]}</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      {LAYOUT_DESCRIPTIONS[opt.type]}
-                    </span>
-                  </div>
-                </button>
-              ))}
-              <div className="h-px my-1 mx-1 bg-border/60" />
-              <button
-                className="toolbar-dropdown-item"
-                onClick={() => handleSelectLayout("tree-horizontal", true)}
-              >
-                <div className="toolbar-dropdown-icon" aria-hidden>
-                  <ScanLine className="h-3.5 w-3.5" />
-                </div>
-                <div className="flex flex-col items-start min-w-0">
-                  <span className="font-medium">Ajustar à tela</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    Aplica árvore horizontal e enquadra
-                  </span>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Layout panel trigger — opens the dedicated LayoutPanel with all 10 layouts */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 transition-colors toolbar-btn"
+          onClick={() => {
+            if (onOpenLayout) onOpenLayout();
+          }}
+          data-tooltip="Organizar layout (Shift+L)"
+          aria-label="Abrir painel de organização visual"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </Button>
       </span>
 
       {/* Gradient divider */}

@@ -2052,3 +2052,115 @@ Stage Summary:
 - ✅ Branch `fase1-inicial-mapa-mental-guiado-ia` removida (Vue/Flask antigo, superseded)
 - ✅ Estrutura final limpa: `main` única branch, todo o histórico preservado
 - URL: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/tree/main
+
+---
+Task ID: 13-A
+Agent: main (Z.ai Code)
+Task: Implementar novos algoritmos de layout visual (árvore à direita, árvore para cima, balanceada, grade, agrupado, camadas DAG)
+
+Work Log:
+- Estendido `src/lib/layout-algorithms.ts`:
+  - Refatorado `layoutTreeHorizontal` e `layoutTreeVertical` para um único `layoutTreeDirectional(direction)` que suporta 4 direções: "left", "right", "down", "up"
+  - Para direções espelhadas ("right", "up"), posições são negadas no eixo de profundidade — root fica na origem, filhos se estendem na direção oposta
+  - Adicionado `layoutBalanced` — algoritmo Reingold-Tilford tidy tree com contorno merged (subtrees hug cada contour), mais compacto para árvores profundas e desiguais
+  - Adicionado `layoutGrid` — cada nível de profundidade ocupa uma linha, siblings organizados em colunas, centralizados
+  - Adicionado `layoutPacked` — agrupa nós por `kind` (concept, question, action, idea, resource, goal) em clusters quadrados, dispostos em 2 linhas balanceadas
+  - Adicionado `layoutLayered` — implementação simplificada do framework Sugiyama: cycle removal via DFS, longest-path layering, barycenter heuristic com 24 iterações, coordinate assignment centralizado. Lida com múltiplos pais e ciclos
+  - `LayoutType` agora é um union de 12 tipos: 10 novos + 2 legacy aliases (`tree-horizontal`, `tree-vertical`) para compat com estado persistido
+  - `computeLayout` atualizado para despachar todos os 12 tipos
+  - `LAYOUT_LABELS`, `LAYOUT_DESCRIPTIONS` atualizados com labels em PT-BR
+  - Novos exports: `LAYOUT_CATEGORIES` (tree/radial/force/structured), `LAYOUT_CATEGORY_LABELS` (PT-BR), `LAYOUT_PREVIEW_SVG` (10 SVG path strings 24x16 para previews visuais)
+- TypeScript: sem erros em layout-algorithms.ts (verificado com `bunx tsc --noEmit`)
+- Lint: 0 erros, 0 warnings
+
+Stage Summary:
+- ✅ 6 novos algoritmos de layout adicionados (tree-right, tree-up, balanced, grid, packed, layered)
+- ✅ 4 layouts existentes preservados com aliases legacy para compat
+- ✅ Total: 10 layouts distintos disponíveis para o usuário
+- ✅ Metadados extras para UI (categorias, previews SVG) preparados para Task 13-B
+
+---
+Task ID: 13-B
+Agent: main (Z.ai Code)
+Task: Criar LayoutPanel dedicado com previews visuais para todos os 10 layouts
+
+Work Log:
+- Criado `src/components/mindmap/LayoutPanel.tsx`:
+  - Painel slide-out da direita com `framer-motion` (spring animation)
+  - Header com ícone LayoutGrid, título "Organização visual" e subtítulo dinâmico mostrando o layout ativo
+  - Body scrollable com custom scrollbar styling
+  - Layouts agrupados por categoria usando `LAYOUT_CATEGORIES`: Árvores (5), Radial (1), Forças (1), Estruturados (3)
+  - Cada layout é um CARD com:
+    - Preview SVG inline (renderizado via `dangerouslySetInnerHTML` com `LAYOUT_PREVIEW_SVG`)
+    - Nome (`LAYOUT_LABELS`)
+    - Descrição (`LAYOUT_DESCRIPTIONS`)
+    - Estado ativo destacado com `bg-primary/10 border-primary` + ícone de check
+    - Hover: `border-primary/50 bg-accent/40 scale-[1.01]`
+  - Persistência do último layout aplicado em `localStorage` (chave `mindmap:lastLayout`)
+  - Auto-fit-to-view após aplicar layout (via `requestAnimationFrame` + `setTimeout`)
+  - Botão "Ajustar à tela" no rodapé (sticky)
+  - Suporte a tecla Escape para fechar
+  - Backdrop com `bg-black/10 backdrop-blur-[1px]` para catch outside-click
+  - Estado vazio quando não há nós no mapa
+- Modificado `src/components/mindmap/Toolbar.tsx`:
+  - Removido dropdown antigo de 4 layouts (que usava GitBranch, Workflow, Network, CircleDot, ScanLine icons)
+  - Substituído por botão simples que chama `onOpenLayout` prop
+  - Adicionado prop opcional `onOpenLayout?: () => void`
+  - Removido estado interno `layoutMenuOpen`, `layoutMenuRef`, `handleSelectLayout` (não mais necessários)
+  - Tooltip atualizado: "Organizar layout (Shift+L)"
+- Modificado `src/app/page.tsx`:
+  - Adicionado estado `layoutPanelOpen` + handler `handleOpenLayout`
+  - Adicionado atalho global `Shift+L` para toggle do painel (ignora quando typing em inputs/textareas)
+  - `LayoutPanel` adicionado aos dynamic imports (code-splitting com `ssr: false`)
+  - Renderizado `<LayoutPanel>` na página (gated por `!readOnly`)
+  - Passado `onOpenLayout={handleOpenLayout}` ao `<Toolbar>`
+- Modificado `src/components/mindmap/ShortcutsPanel.tsx`:
+  - Adicionado `{ keys: "Shift + L", action: "Abrir painel de organização visual (layouts)", category: "Visualização" }`
+- Lint: 0 erros, 0 warnings ✓
+- QA via agent-browser:
+  - App carrega com título correto "Mapa Mental Complexo com IA" ✓
+  - Botão "Abrir painel de organização visual" presente no toolbar ✓
+  - Click abre o painel mostrando 10 layouts em 4 categorias ✓
+  - Headers das categorias visíveis: "ÁRVORES", "RADIAL", "FORÇAS", "ESTRUTURADOS" ✓
+  - Click em "Árvore à direita" aplica layout com sucesso ✓
+  - Click em "Grade por níveis" aplica layout ✓
+  - Click em "Balanceada" aplica layout ✓
+  - Shift+L fecha o painel ✓
+  - Shift+L abre o painel novamente ✓
+  - 0 erros de console ✓
+  - 3 screenshots salvos: /tmp/layout-right.png, /tmp/layout-grid.png, /tmp/layout-balanced.png
+
+Stage Summary:
+- ✅ LayoutPanel criado com 10 layouts em 4 categorias, previews SVG visuais
+- ✅ Dropdown antigo do Toolbar removido (era limitado a 4 layouts)
+- ✅ Atalho Shift+L funcional para toggle do painel
+- ✅ Persistência do último layout aplicado em localStorage
+- ✅ Auto-fit-to-view após aplicar layout
+- ✅ ShortcutsPanel atualizado com novo atalho
+- ✅ Code-splitting mantido (LayoutPanel é dynamic import com ssr:false)
+- ✅ QA via agent-browser confirmou funcionamento completo
+
+---
+Task ID: 13-C
+Agent: main (Z.ai Code)
+Task: Adicionar atalhos de teclado para o painel de layouts
+
+Work Log:
+- Atalho `Shift+L` implementado em `src/app/page.tsx`:
+  - useEffect registra handler global de keydown
+  - Detecta Shift+L (sem Ctrl/Cmd/Alt) — case insensitive
+  - Ignora quando foco está em INPUT, TEXTAREA, SELECT ou contentEditable (não interfere na digitação)
+  - `e.preventDefault()` para evitar comportamento padrão do browser
+  - Toggle do estado `layoutPanelOpen`
+  - Desativado em modo read-only (`?share=XXX`)
+- Atalho documentado em `src/components/mindmap/ShortcutsPanel.tsx`:
+  - Categoria: "Visualização"
+  - Texto: "Abrir painel de organização visual (layouts)"
+- Tooltip do botão no Toolbar atualizado: "Organizar layout (Shift+L)"
+- QA confirmou funcionamento: Shift+L abre E fecha o painel
+
+Stage Summary:
+- ✅ Atalho Shift+L funcional para toggle do LayoutPanel
+- ✅ Documentado no ShortcutsPanel
+- ✅ Não interfere em inputs/textareas
+- ✅ Desativado em modo read-only

@@ -33,6 +33,7 @@ const SearchPanel = dynamic(() => import("@/components/mindmap/SearchPanel").the
 const TemplatesPanel = dynamic(() => import("@/components/mindmap/TemplatesPanel").then(m => ({ default: m.TemplatesPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const ShareDialog = dynamic(() => import("@/components/mindmap/ShareDialog").then(m => ({ default: m.ShareDialog })), { ssr: false });
 const RemoteCursors = dynamic(() => import("@/components/mindmap/RemoteCursors").then(m => ({ default: m.RemoteCursors })), { ssr: false });
+const LayoutPanel = dynamic(() => import("@/components/mindmap/LayoutPanel").then(m => ({ default: m.LayoutPanel })), { ssr: false });
 
 /** Lightweight skeleton shown while a lazy panel chunk is loading. */
 function PanelSkeleton() {
@@ -72,6 +73,8 @@ export default function Home() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
   const [tourForceShow, setTourForceShow] = useState(false);
+  // LayoutPanel open state — also toggled by Shift+L keyboard shortcut.
+  const [layoutPanelOpen, setLayoutPanelOpen] = useState(false);
   // Read-only share mode (`?share=XXX` query param) — when true, hides all
   // editing UI and loads the map from the public /api/share/[shareId] endpoint.
   const [readOnly, setReadOnly] = useState(false);
@@ -191,6 +194,33 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, [openSearch, readOnly]);
 
+  // Global Shift+L to toggle the LayoutPanel (visual organization) — disabled in read-only mode.
+  useEffect(() => {
+    if (readOnly) return;
+    const handler = (e: KeyboardEvent) => {
+      // Shift+L (no ctrl/cmd) — toggle layout panel
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === "L" || e.key === "l")) {
+        const target = e.target as HTMLElement | null;
+        // Don't trigger when typing in inputs / textareas / contenteditable
+        if (target) {
+          const tag = target.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) {
+            return;
+          }
+        }
+        e.preventDefault();
+        setLayoutPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [readOnly]);
+
+  // Handler to open the LayoutPanel (passed to Toolbar).
+  const handleOpenLayout = useCallback(() => {
+    setLayoutPanelOpen(true);
+  }, []);
+
   // Autosave hook — disabled in read-only mode (no edits to save).
   useAutosave();
 
@@ -308,6 +338,7 @@ export default function Home() {
             onOpenSearch={() => setCommandPaletteOpen(true)}
             onOpenNodeEditor={handleOpenNodeEditor}
             onOpenShare={handleOpenShare}
+            onOpenLayout={handleOpenLayout}
           />
         )}
 
@@ -348,6 +379,9 @@ export default function Home() {
           )}
           {!readOnly && templatesOpen && (
             <TemplatesPanel open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
+          )}
+          {!readOnly && (
+            <LayoutPanel open={layoutPanelOpen} onClose={() => setLayoutPanelOpen(false)} />
           )}
         </div>
 

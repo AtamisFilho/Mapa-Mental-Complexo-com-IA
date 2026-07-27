@@ -22,6 +22,7 @@ export function ShortcutsPanel({ open, onClose }: Props) {
     { keys: "Delete / Backspace", action: "Excluir nó selecionado", category: "Edição" },
     { keys: "Esc", action: "Cancelar seleção / conexão", category: "Geral" },
     { keys: "F", action: "Ajustar mapa à tela (fit)", category: "Visualização" },
+    { keys: "Shift + L", action: "Abrir painel de organização visual (layouts)", category: "Visualização" },
     { keys: "C", action: "Adicionar Conceito", category: "Adicionar" },
     { keys: "P", action: "Adicionar Pergunta", category: "Adicionar" },
     { keys: "A", action: "Adicionar Ação", category: "Adicionar" },
