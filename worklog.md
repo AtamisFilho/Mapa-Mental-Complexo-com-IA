@@ -1887,3 +1887,36 @@ Stage Summary:
 - **Artefatos limpos**: tool-results/ removidos do repo, adicionados ao .gitignore
 - **Próximo passo recomendado**: o utilizador pode fazer merge do PR #1 (ou solicitar revisão/melhorias adicionais)
 - O cron job webDevReview continuará a fazer QA e propor melhorias a cada 15 minutos automaticamente
+
+---
+Task ID: 10-deploy
+Agent: main (orchestrator)
+Task: Preparar deploy para usuário leigo — criar configs de deploy e guia passo-a-passo
+
+Work Log:
+- Diagnosticado stack: Next.js 16 standalone + Prisma SQLite + socket.io mini-service + z-ai-web-dev-sdk
+- Identificado que Vercel/Netlify não funcionam (SQLite efêmero + WebSocket incompatível com serverless)
+- Recomendado Railway como melhor opção para leigo (suporta volume persistente + múltiplos serviços)
+- Criado `Dockerfile` multi-stage para o app Next.js:
+  - Stage 1 (deps): bun install --frozen-lockfile
+  - Stage 2 (builder): prisma generate + next build
+  - Stage 3 (runner): runtime enxuto com standalone output + Prisma client
+  - HEALTHCHECK em /api/maps, DATABASE_URL=file:/app/data/mindmap.db
+- Criado `docker-entrypoint.sh`: roda `prisma db push` + inicia `node server.js`
+- Criado `mini-services/collab-service/Dockerfile`: Bun runtime para socket.io
+- Criado `railway.json` (raiz) e `mini-services/collab-service/railway.json` com config Dockerfile
+- Tornado porta dinâmica no collab-service: `PORT = process.env.PORT || 3003`
+- Modificado `src/hooks/use-collab.ts` para usar `NEXT_PUBLIC_COLLAB_URL` em produção (fallback Caddy em sandbox)
+- Removido `allowedDevOrigins` de next.config.ts (só fazia sentido no sandbox)
+- Criado `.env.example` documentando DATABASE_URL e NEXT_PUBLIC_COLLAB_URL
+- Criado `DEPLOY.md` — guia passo-a-passo para leigos em PT-BR (15 min, 6 passos)
+- Lint: 0 erros, 0 warnings ✓
+- QA via agent-browser: página carregou sem erros após mudanças
+- Commit `6d2110f` pushed para branch round9 (atualiza PR #1)
+
+Stage Summary:
+- **Deploy pronto para Railway** — usuário leigo só precisa clique-clique no painel
+- **PR #1 atualizado** com configs de deploy: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/pull/1
+- **Artefatos criados**: Dockerfile, docker-entrypoint.sh, railway.json (x2), .env.example, DEPLOY.md
+- **Mudanças de código**: collab-service port dinâmico, use-collab URL dinâmica, next.config limpo
+- **Próximo passo**: usuário segue DEPLOY.md (15 min) para publicar o app
