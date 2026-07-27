@@ -1,0 +1,117 @@
+# ============================================================================
+# Mapa Mental Complexo com IA — Docker Compose
+# ============================================================================
+# Arquitetura:
+#   - postgres:    PostgreSQL 16 compartilhado (outros projetos podem usar a mesma rede)
+#   - web:         App Next.js (porta 3000)
+#   - collab:      Serviço de colaboração em tempo real (socket.io, porta 3003)
+#
+# Como usar:
+#   1. cp .env.example .env  (e ajuste as senhas se quiser)
+#   2. docker compose up -d
+#   3. Acesse http://localhost:3000
+#
+# Para compartilhar o PostgreSQL com OUTROS projetos:
+#   - Coloque os outros projetos na mesma rede "mindmap-network"
+#   - Conecte-se ao host "postgres" na porta 5432
+#   - Ex: postgresql://user:pass@postgres:5432/outro_projeto_db
+# ============================================================================
+
+services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # PostgreSQL — banco de dados compartilhado
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mindmap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mindmap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mindmap_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-mindmap}
+      # Otimização para uso leve (ajuste conforme seu hardware)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script de inicialização: cria bancos para outros projetos (opcional)
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mindmap-network
+    ports:
+      # Expor no host só se quiser acessar via ferramentas externas (DBeaver, etc.)
+      # Em produção, REMOVER esta seção para o banco não ficar acessível externamente
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindmap} -d ${POSTGRES_DB:-mindmap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Web — App Next.js principal
+  # ──────────────────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindmap-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mindmap}:${POSTGRES_PASSWORD:-mindmap_dev}@postgres:5432/${POSTGRES_DB:-mindmap}?schema=public
+      NEXT_PUBLIC_COLLAB_URL: http://localhost:3003
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    networks:
+      - mindmap-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/maps > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Collab — serviço de colaboração em tempo real (socket.io)
+  # ──────────────────────────────────────────────────────────────────────────
+  collab:
+    build:
+      context: ./mini-services/collab-service
+      dockerfile: Dockerfile
+    container_name: mindmap-collab
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      NODE_ENV: production
+      # CORS — permite que o web e apps externos se conectem
+      CORS_ORIGIN: "*"
+    ports:
+      - "3003:3003"
+    networks:
+      - mindmap-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# ────────────────────────────────────────────────────────────────────────────
+# Volume persistente — sobrevive a restarts/redeploys
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: mindmap-postgres-data
+
+# ────────────────────────────────────────────────────────────────────────────
+# Rede compartilhada — outros projetos podem usar o mesmo PostgreSQL
+# ────────────────────────────────────────────────────────────────────────────
+networks:
+  mindmap-network:
+    name: mindmap-network
+    # external: true  # descomente se quiser que a rede já exista (compartilhada entre projetos)

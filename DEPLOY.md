@@ -1,168 +1,266 @@
 # 🚀 Guia de Deploy — Mapa Mental Complexo com IA
 
-Este guia explica como **publicar o seu site na internet** para que qualquer pessoa possa acessá-lo por um link (ex: `https://mapa-mental.up.railway.app`).
+Este guia cobre **3 cenários** — escolha o que se adapta a você:
 
-> 👶 **Escrito para iniciantes** — não precisa saber programar. Basta seguir os passos em ordem, clicando onde indicado.
+| Cenário | Quando usar | Custo |
+|---------|-------------|-------|
+| **🅰️ Docker Compose** (RECOMENDADO para si) | Quer rodar no seu próprio servidor, compartilhar PostgreSQL com outros projetos | ~$5/mês (VPS) |
+| **🅱️ Railway** (nuvem simples) | Prefere não mexer com servidor, deploy com 2 cliques | free trial → ~$5/mês |
+| **🅲️ Teste Offline (PWA)** | Testar no seu PC e Android ANTES de publicar | grátis |
 
----
-
-## 📋 Antes de começar — o que você vai precisar
-
-| O quê | Tempo estimado | Custo |
-|-------|----------------|-------|
-| Uma conta no **GitHub** (já tem, pois o código está lá) | — | grátis |
-| Uma conta no **Railway** (vamos criar agora) | 2 min | free trial de $5 |
-| Cartão de crédito **OU** PayPal (só para validar a conta — não será cobrado durante o trial) | — | — |
-
-**⏱️ Tempo total do deploy: ~15 minutos**
+> 👶 **Escrito para iniciantes** — não precisa saber programar. Siga os passos em ordem.
 
 ---
 
-## 🎯 Por que Railway e não Vercel?
+## 🅰️ Docker Compose (RECOMENDADO para si)
 
-O seu app usa **SQLite** (banco de dados em arquivo) e tem um **serviço de colaboração em tempo real** (WebSocket). A Vercel não suporta nenhum dos dois. O Railway suporta ambos nativamente, com configuração mínima.
+Esta é a melhor opção para você porque:
+- ✅ **Compartilha o mesmo PostgreSQL** com seus outros projetos mais complexos
+- ✅ Roda no seu próprio servidor (controle total)
+- ✅ Funciona offline (para testes antes de publicar)
+- ✅ É a configuração que você já planejou usar
+
+### Pré-requisitos
+
+1. **Docker** + **Docker Compose** instalados no servidor/PC
+   - Linux: `curl -fsSL https://get.docker.com | sh`
+   - Windows/Mac: instale o **Docker Desktop** (https://docker.com)
+2. **Git** para clonar o repositório
+
+### Passo 1 — Clonar o repositório
+
+```bash
+git clone https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA.git
+cd Mapa-Mental-Complexo-com-IA
+```
+
+### Passo 2 — Configurar variáveis de ambiente
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` e ajuste a senha do PostgreSQL (mude `mindmap_dev` para uma senha forte):
+
+```bash
+POSTGRES_PASSWORD="uma-senha-forte-aqui"
+DATABASE_URL="postgresql://mindmap:uma-senha-forte-aqui@localhost:5432/mindmap?schema=public"
+NEXT_PUBLIC_COLLAB_URL="http://localhost:3003"
+```
+
+### Passo 3 — Subir tudo (PostgreSQL + Web + Colaboração)
+
+```bash
+docker compose up -d --build
+```
+
+⏱️ Primeira vez: ~5 minutos (baixa imagens + build). Próximas vezes: ~30 segundos.
+
+### Passo 4 — Acessar o app
+
+- **App**: http://localhost:3000
+- **Colaboração** (interno, não precisa acessar): porta 3003
+- **PostgreSQL**: porta 5432 (para conectar ferramentas como DBeaver)
+
+### Passo 5 — Compartilhar PostgreSQL com OUTROS projetos
+
+O PostgreSQL criado pelo Docker Compose pode ser usado por seus outros projetos. **Duas formas**:
+
+#### Forma A — Adicionar bancos no script de init
+
+Edite `docker/postgres-init/01-create-databases.sh` e adicione:
+
+```bash
+createdb_if_not_exists "outro_projeto_db"
+createdb_if_not_exists "analytics_db"
+```
+
+Depois: `docker compose down && docker compose up -d`
+
+#### Forma B — Conectar outros containers Docker à mesma rede
+
+No `docker-compose.yml` do **outro projeto**, adicione:
+
+```yaml
+services:
+  outro-app:
+    # ...
+    networks:
+      - mindmap-network  # rede compartilhada
+
+networks:
+  mindmap-network:
+    external: true
+    name: mindmap-network
+```
+
+E configure a `DATABASE_URL` do outro projeto assim:
+
+```
+postgresql://mindmap:senha@postgres:5432/outro_projeto_db?schema=public
+```
+
+(host = `postgres` porque é o nome do serviço na rede Docker)
+
+### Comandos úteis (Docker Compose)
+
+```bash
+# Ver logs do app
+docker compose logs -f web
+
+# Reiniciar só o web
+docker compose restart web
+
+# Parar tudo (não apaga dados)
+docker compose down
+
+# Parar e APAGAR o banco (⚠️ perde todos os mapas)
+docker compose down -v
+
+# Atualizar app após git pull
+git pull && docker compose up -d --build
+```
 
 ---
 
-## 🚦 Passo a passo
+## 🅱️ Railway (nugem simples)
 
-### Passo 1 — Criar conta no Railway (2 min)
+> Use esta opção se não quiser mexer com servidor. Mas para o seu caso (vários projetos + PostgreSQL compartilhado), a opção 🅰️ é melhor.
 
-1. Acesse **https://railway.app**
-2. Clique no botão **"Login"** no canto superior direito
-3. Clique em **"Login with GitHub"** (é a forma mais fácil — conecta direto ao seu repositório)
-4. Autorize o Railway a acessar sua conta GitHub
-5. Pronto! Você está dentro do dashboard
+### Por que Railway e não Vercel?
 
-### Passo 2 — Criar o projeto a partir do GitHub (3 min)
+O app usa **PostgreSQL** (banco de dados) e tem um **serviço de colaboração em tempo real** (WebSocket). A Vercel não suporta WebSocket em apps serverless. O Railway suporta ambos.
 
-1. No dashboard do Railway, clique em **"New Project"** (botão verde, no canto superior direito)
-2. Selecione **"Deploy from GitHub repo"**
-3. Se aparecer a lista de repositórios, procure por `Mapa-Mental-Complexo-com-IA`
-   - Se não aparecer, clique em **"Configure GitHub App"** e dê permissão ao repositório
-4. Clique no repositório `Mapa-Mental-Complexo-com-IA`
-5. **⚠️ IMPORTANTE — NÃO clique em "Deploy Now" ainda!**
-   - Você verá uma tela perguntando qual serviço criar
-   - Clique em **"Add Service"** → deixe em branco por enquanto
-   - Vamos configurar **dois serviços**: o app principal e o collab-service
+### Passo a passo resumido
 
-### Passo 3 — Criar o Serviço 1 (App Principal Next.js) (3 min)
+1. Acesse **https://railway.app** → "Login with GitHub"
+2. "New Project" → "Deploy from GitHub repo" → escolha `Mapa-Mental-Complexo-com-IA`
+3. Crie **2 serviços**:
+   - **`web`** (raiz do repo): variável `DATABASE_URL` = string de conexão do Postgres
+   - **`collab`** (subpasta `mini-services/collab-service`): porta 3003
+4. Adicione um **PostgreSQL** ("+ New" → "Database" → "PostgreSQL")
+5. No serviço `web`, adicione a variável `NEXT_PUBLIC_COLLAB_URL` com a URL pública do `collab`
+6. Gere domínios públicos para os dois serviços
+7. 🎉 Acesse a URL pública do `web`
 
-1. Na página do projeto, clique em **"+ New"** → **"GitHub Repo"**
-2. Selecione `AtamisFilho/Mapa-Mental-Complexo-com-IA`
-3. O Railway vai detectar o `Dockerfile` automaticamente e começar a build
-4. **Renomeie o serviço**: clique no lápis ao lado do nome (algo como `railway-app-xxxx`) e mude para **`web`**
-5. **Configurar variáveis de ambiente**:
-   - Clique no serviço `web`
-   - Vá na aba **"Variables"**
-   - Clique em **"New Variable"** e adicione:
-     ```
-     Name:  DATABASE_URL
-     Value: file:/app/data/mindmap.db
-     ```
-6. **Adicionar volume persistente** (para o SQLite não perder dados):
-   - No serviço `web`, vá na aba **"Settings"**
-   - Desça até **"Volumes"**
-   - Clique em **"Add Volume"**
-   - Configure:
-     - **Mount path**: `/app/data`
-     - **Name**: `data` (ou deixe automático)
-   - Clique em **"Add"**
+### Detalhes completos
 
-### Passo 4 — Criar o Serviço 2 (Colaboração em Tempo Real) (2 min)
-
-1. De volta à página do projeto, clique em **"+ New"** → **"GitHub Repo"**
-2. Selecione novamente `AtamisFilho/Mapa-Mental-Complexo-com-IA`
-3. **Configurar o root directory** (porque este serviço está numa subpasta):
-   - Clique no novo serviço
-   - Vá na aba **"Settings"**
-   - Procure por **"Root Directory"** e clique em **"Configure"**
-   - Digite: `mini-services/collab-service`
-   - Clique em **"Save"**
-4. **Renomeie o serviço** para **`collab`**
-5. O Railway detectará o `mini-services/collab-service/Dockerfile` automaticamente
-
-### Passo 5 — Conectar os dois serviços (2 min)
-
-1. No serviço `web`, vá na aba **"Variables"**
-2. Clique em **"New Variable"** e adicione:
-   ```
-   Name:  NEXT_PUBLIC_COLLAB_URL
-   Value: (cole aqui a URL do serviço collab — ver passo abaixo)
-   ```
-3. **Descobrir a URL do serviço collab**:
-   - Clique no serviço `collab`
-   - Vá na aba **"Settings"** → **"Networking"**
-   - Clique em **"Generate Domain"**
-   - Uma URL vai aparecer, tipo: `collab-production-xxxx.up.railway.app`
-   - Copie essa URL completa (com `https://`)
-4. **Cole essa URL** na variável `NEXT_PUBLIC_COLLAB_URL` do serviço `web`
-
-### Passo 6 — Gerar a URL pública do app (1 min)
-
-1. Clique no serviço `web`
-2. Vá na aba **"Settings"** → **"Networking"**
-3. Clique em **"Generate Domain"**
-4. Uma URL vai aparecer, tipo: `web-production-xxxx.up.railway.app`
-5. **🎉 Acesse essa URL no navegador — seu app está no ar!**
+Veja o histórico deste ficheiro no commit `6d2110f` para a versão detalhada com prints.
 
 ---
 
-## ✅ Checklist final
+## 🅲️ Teste Offline no PC e Android (PWA)
+
+O app é uma **PWA** (Progressive Web App) — pode ser instalado no PC e no Android como um app nativo, e funciona offline.
+
+### No PC (Chrome/Edge)
+
+1. Suba o app localmente (opção 🅰️ ou `bun run dev`)
+2. Abra **http://localhost:3000** no Chrome ou Edge
+3. Procure o ícone **⊕ Instalar** na barra de endereço (canto direito)
+   - Ou: menu ⋮ → "Instalar Mapa Mental IA..."
+4. Clique em **Instalar**
+5. O app abre como janela separada e fica no Menu Iniciar
+
+### No Android
+
+**Requisito**: o app precisa estar acessível pelo celular (mesma rede WiFi).
+
+#### Opção 1 — Usar o IP do PC (teste local)
+
+1. Descubra o IP do PC: no terminal, `ip addr | grep "inet "` (Linux) ou `ipconfig` (Windows)
+   - Ex: `192.168.1.100`
+2. Suba o app com Docker Compose (opção 🅰️)
+3. No Android, abra **Chrome** e visite: `http://192.168.1.100:3000`
+4. Menu ⋮ → **"Instalar aplicativo"**
+5. O app aparece na gaveta de apps como um ícone nativo
+
+#### Opção 2 — Via ngrok (acesso externo temporário)
+
+Para testar o PWA num Android fora de casa:
+
+```bash
+# Instalar ngrok (uma vez)
+npm install -g ngrok
+
+# Expor o app local na internet
+ngrok http 3000
+```
+
+O ngrok mostra uma URL tipo `https://abc123.ngrok.app`. Abra no Android e instale.
+
+### Testar o modo offline
+
+1. Abra o app instalado
+2. Crie um mapa mental e adicione alguns nós
+3. **Desligue a internet** (modo avião no Android, ou desligue WiFi no PC)
+4. Recarregue a página — o mapa deve continuar acessível e editável
+5. Os dados são salvos localmente e sincronizam quando a internet voltar (somente se houver PostgreSQL conectado; em modo `bun run dev` com SQLite, já estão salvos)
+
+### Recursos PWA implementados
+
+- ✅ **Manifest** (`/manifest.webmanifest`) — nome, ícones, cores, atalhos
+- ✅ **Service Worker** (`/sw.js`) — cache offline de:
+  - App shell (HTML/JS/CSS) — Stale-While-Revalidate
+  - Imagens — Cache-First
+  - API GET — Network-First com fallback offline
+- ✅ **Ícones** em 5 tamanhos: 32, 192, 512 (standard + maskable), 180 (apple-touch)
+- ✅ **Meta tags** para iOS, Android e Desktop
+- ✅ **Atalhos** no menu do app: "Novo mapa" e "Gerar com IA"
+
+---
+
+## ✅ Checklist final (qualquer opção)
 
 Antes de considerar pronto, verifique:
 
-- [ ] Acesse a URL do `web` — a página inicial carregou com o editor de mapa mental
-- [ ] Crie um novo mapa mental e adicione alguns nós
-- [ ] Recarregue a página — **os nós devem continuar lá** (confirma que o SQLite persistente está funcionando)
+- [ ] A página inicial carregou com o editor de mapa mental
+- [ ] Crie um mapa mental e adicione nós
+- [ ] Recarregue a página — **os nós devem continuar lá** (banco persistente)
 - [ ] Clique em "Partilhar mapa" e copie o link — abre em modo leitura
-- [ ] (Opcional) Abra o link de share em outra aba/janela — confirma que está público
+- [ ] **PWA**: instale o app e teste offline
 
 ---
 
-## 💰 Sobre custos
+## 💰 Comparação de custos
 
-O Railway oferece **$5 de crédito grátis** ao criar a conta. Para um app pessoal com pouco tráfego, isso dura cerca de **1 mês**. Depois disso:
-
-- **Uso leve** (você + alguns amigos): **~$5/mês**
-- **Uso intenso** (muitos usuários simultâneos): pode chegar a $20/mês
-
-Você pode definir **limites de gastos** no dashboard para nunca ser surpreendido.
+| Opção | Setup | Manutenção mensal | Recomendado para |
+|-------|-------|-------------------|------------------|
+| 🅰️ Docker Compose (VPS Hetzner/DigitalOcean) | 30 min | ~$4-6 | **Seu caso** (vários projetos) |
+| 🅱️ Railway | 15 min | ~$5 | Iniciantes sem servidor |
+| 🅲️ Teste local | 5 min | grátis | Validação antes de publicar |
 
 ---
 
-## 🆘 Resolução de problemas comuns
+## 🆘 Resolução de problemas
 
-### ❌ "A página ficou em branco"
+### Docker Compose
 
-- Abra o Console do navegador (F12 → aba "Console")
-- Se aparecer erro de **CORS** ou **WebSocket connection failed**, é o `NEXT_PUBLIC_COLLAB_URL` mal configurado — verifique se começa com `https://` e não tem barra no final
+**"Port 5432 already in use"** — outro PostgreSQL já está rodando no PC. Solução: edite `docker-compose.yml` e mude `"5432:5432"` para `"5433:5432"`.
 
-### ❌ "Perdi todos os mapas quando recarreguei"
+**"Cannot connect to PostgreSQL"** — aguarde 30s após `docker compose up` (o Postgres leva tempo para iniciar na primeira vez).
 
-- O volume persistente não está configurado. Volte ao **Passo 3, item 6** e adicione o volume em `/app/data`
+### PWA
 
-### ❌ "Erro de build"
+**"O ícone de instalar não aparece"** — o SW só se ativa em produção. Se estiver rodando com `bun run dev`, o PWA não instala. Use `docker compose up` ou faça `bun run build && bun run start`.
 
-- Clique no serviço `web` → aba **"Deployments"** → clique no deploy que falhou
-- Leia o log. O erro mais comum é `prisma generate` falhando — mas o Dockerfile já cuida disso
+**"App não funciona offline"** — na primeira visita, o browser precisa carregar todos os recursos online UMA vez. Depois funciona offline. Limpe o cache e tente de novo.
 
-### ❌ "Como ver os logs do app?"
+### Railway
 
-- Clique no serviço → aba **"Deployments"** → clique no deploy atual → **"Logs"** ou **"Details"**
+**"A página ficou em branco"** — abra o Console do navegador (F12). Erro de **CORS** ou **WebSocket** = `NEXT_PUBLIC_COLLAB_URL` mal configurada.
 
 ---
 
 ## 🔄 Atualizações futuras
 
-Sempre que você quiser atualizar o app em produção:
+Sempre que quiser atualizar:
 
-1. Faça as alterações no código
-2. Faça `git push` para o GitHub (ou merge um PR)
-3. **O Railway detecta automaticamente** e republica em ~2 minutos
+- **Docker Compose**: `git pull && docker compose up -d --build` (automático em ~1 min)
+- **Railway**: faz `git push` e o Railway detecta e republica sozinho
 
 ---
 
 ## 📞 Precisa de ajuda?
 
-Se travar em algum passo, me diga **exatamente em qual** e qual erro apareceu (print da tela ajuda muito). Posso te orientar de forma mais específica.
+Se travar em algum passo, me diga **exatamente em qual** e qual erro apareceu (print da tela ajuda muito).
