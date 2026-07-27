@@ -52,3 +52,7 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Internal tool artifacts (not source code)
+/tool-results/
+/agent-ctx/
