@@ -1965,3 +1965,61 @@ Work Log:
 Stage Summary:
 - ✅ PostgreSQL + Docker Compose + PWA completos e pushed
 - ✅ Usuário pode agora seguir DEPLOY.md (opção A) para instalar no PC
+
+---
+Task ID: 12-production-cleanup
+Agent: main (orchestrator)
+Task: Limpar mocks/artefatos para produção + criar guia de instalação no notebook
+
+Work Log:
+## 1. Auditoria de mocks e artefatos
+- Auditado todo o src/ em busca de mocks/seeds/dummy data
+- Resultado: NÃO HÁ mocks de dados no código (apenas atributos HTML placeholder legítimos)
+- Encontrados artefatos para remover:
+  - download/qa-*.png (22 screenshots de QA)
+  - qa-screenshots/*.png (11 screenshots anteriores)
+  - agent-ctx/*.md (5 ficheiros de contexto de subagents)
+  - tool-results/*.txt (45 outputs de ferramentas internas)
+  - .zscripts/dev.pid (ficheiro de processo)
+  - db/custom.db (banco SQLite com dados de teste do sandbox)
+
+## 2. Limpeza de código
+- src/lib/db.ts: log do Prisma mudou de ['query'] (inunda produção com SQL)
+  para ['error'] em produção, ['warn','error'] em dev
+- src/app/layout.tsx: adicionado metadataBase (resolve warning do Next.js
+  sobre URLs de OpenGraph/Twitter)
+- .gitignore: adicionado /download/, /.zscripts/, /db/*.db para evitar
+  que voltem a ser committed
+- db/.gitkeep: garante que a pasta db/ existe para SQLite fallback
+
+## 3. Limpeza física e tracking
+- git rm -r --cached download/ agent-ctx/ qa-screenshots/ (99 ficheiros)
+- git rm db/custom.db (banco de teste)
+- git rm .zscripts/dev.pid
+- rm -rf fisicamente todos os artefatos
+- Total: 109 ficheiros removidos
+
+## 4. Guia de instalação no notebook
+- Criado INSTALACAO.md (300 linhas) com 2 métodos:
+  - Método A (Docker Desktop): Windows/Mac/Linux — recomendado
+  - Método B (Bun + SQLite): alternativa leve
+- Inclui: passo-a-passo com comandos, teste PWA, instalação no Android,
+  resolução de problemas, checklist final
+
+## QA final
+- Lint: 0 erros, 0 warnings ✓
+- Dev server reiniciado com NODE_OPTIONS=--max-old-space-size=768
+- agent-browser: título correto, 26 botões renderizados, 0 erros ✓
+- /manifest.webmanifest e /sw.js servindo corretamente ✓
+
+## Commits e push
+- Commit 293e310: chore: clean all mocks, QA artifacts, test DB, debug logs
+- Commit 3072be8: docs: add INSTALACAO.md
+- Ambos pushed para branch round9
+- PR #1 atualizado: 24 commits, 158 ficheiros, +27,977 linhas
+
+Stage Summary:
+- ✅ Projeto limpo para produção (sem mocks, sem artefatos, sem logs de debug)
+- ✅ Guia de instalação no notebook criado (INSTALACAO.md)
+- ✅ Tudo pushed e PR atualizado
+- Próximo passo: usuário segue INSTALACAO.md para instalar no notebook
