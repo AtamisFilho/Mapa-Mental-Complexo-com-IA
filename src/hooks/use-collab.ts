@@ -377,13 +377,26 @@ export function useCollab(
       identityRef.current = ident;
       setIdentity(ident);
 
-      const sock = io("/?XTransformPort=3003", {
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        timeout: 10000,
-      });
+      // Em produção (Railway/Vercel/etc.), conecta direto à URL pública do collab-service.
+      // No sandbox local, usa o gateway Caddy com XTransformPort=3003.
+      const collabUrl =
+        typeof window !== "undefined"
+          ? (window as unknown as { __NEXT_DATA__?: { runtimeConfig?: { collabUrl?: string } } })
+              ?.__NEXT_DATA__?.runtimeConfig?.collabUrl ||
+            process.env.NEXT_PUBLIC_COLLAB_URL ||
+            ""
+          : "";
+
+      const sock = io(
+        collabUrl || "/?XTransformPort=3003",
+        {
+          transports: ["websocket"],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+        }
+      );
       socketRef.current = sock;
       setSocket(sock);
 

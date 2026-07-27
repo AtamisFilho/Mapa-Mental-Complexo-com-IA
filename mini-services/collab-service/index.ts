@@ -38,7 +38,8 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-const PORT = 3003;
+// Porta dinâmica: em produção (Railway) usa process.env.PORT; no sandbox local usa 3003
+const PORT = Number(process.env.PORT) || 3003;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
