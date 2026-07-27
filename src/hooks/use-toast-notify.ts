@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useCallback, useMemo } from "react";
 
 export type ToastVariant = "default" | "success" | "error";
 
@@ -75,16 +76,26 @@ export function useToastNotify() {
   const removeToast = useToastNotifyStore((s) => s.removeToast);
   const markExiting = useToastNotifyStore((s) => s.markExiting);
 
-  return {
-    toast: (params: {
+  // Memoize the returned functions so they have stable identities across
+  // renders. Without this, every render creates new arrow functions, which
+  // destabilizes any `useCallback`/`useEffect` that depends on `toast` —
+  // a common source of infinite refetch loops.
+  const toast = useCallback(
+    (params: {
       title: string;
       description?: string;
       variant?: ToastVariant;
     }) => addToast(params),
+    [addToast]
+  );
 
-    dismiss: (id: string) => {
+  const dismiss = useCallback(
+    (id: string) => {
       markExiting(id);
       setTimeout(() => removeToast(id), EXIT_ANIM_MS);
     },
-  };
+    [markExiting, removeToast]
+  );
+
+  return useMemo(() => ({ toast, dismiss }), [toast, dismiss]);
 }

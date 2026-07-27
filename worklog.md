@@ -1654,3 +1654,131 @@ Stage Summary:
 - Para desbloquear, o utilizador precisa de fornecer: (1) URL do repo (ex: `https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA.git`) e (2) um Personal Access Token com escopo `repo`.
 - Alternativa: avançar com Round 9 (Mermaid export, code-splitting, WebSocket collaboration) para gerar mudanças reais de código antes de commitar.
 - Não foi feito qualquer commit/push/PR falso — resposta honesta dada ao utilizador.
+
+---
+Task ID: 9-C
+Agent: full-stack-developer
+Task: Build socket.io collaboration mini-service + frontend presence/cursors.
+
+Work Log:
+- Read worklog.md (last ~250 lines) to understand prior progress: Tasks 0–17 complete; app has interactive minimap, 4 layout algorithms, drag-to-reparent, Mermaid export, canvas bg customization, search & replace, templates, favorites, etc. WebSocket collaboration was explicitly listed as a recommended next step (Round 9 + Round 10).
+- Read existing files for context: `src/lib/settings.ts` (FeatureSettings + SETTING_CATEGORIES), `src/store/mindmap-store.ts` (Zustand store shape, viewport model `world = (screen - viewport)/zoom`), `src/lib/types.ts` (MapNode/MapEdge), `src/store/settings-store.ts` (persist version 3 with deep-merge), `examples/websocket/server.ts` + `frontend.tsx` (socket.io path `/` + `XTransformPort` query convention).
+- Created `mini-services/collab-service/`:
+  - `package.json` — name `collab-service`, type `module`, scripts `{ "dev": "bun --hot index.ts" }`, dep `socket.io@^4.8.1`.
+  - `index.ts` — socket.io server on hardcoded port **3003**, path `/`, CORS `*`, ping 25s/60s. In-memory roster `Map<mapId, Map<userId, RoomUser>>` + reverse `socketId → Set<mapId>` for cleanup on disconnect. Cursor throttle: drops `cursor:move` if same userId moved <16ms ago. Graceful shutdown on SIGTERM/SIGINT. Logs connection/disconnection/join/leave to stdout.
+  - `README.md` — protocol reference (client→server + server→client tables), run instructions, behavior notes (rooms, in-memory roster, cursor throttle, self-echo prevention via `socket.to(room)`).
+  - Ran `cd mini-services/collab-service && bun add socket.io` → installed socket.io@4.8.3 + 22 transitive deps.
+- Created `src/hooks/use-collab.ts` — `useCollab(mapId, enabled)` hook:
+  - Lazy dynamic import `await import("socket.io-client")` so socket.io-client is NOT in the initial bundle (only loaded when collab is enabled).
+  - Connects with `io("/?XTransformPort=3003", { transports: ["websocket"], reconnection: true, reconnectionAttempts: 10 })` — relative path + port in query, NEVER absolute URL.
+  - Identity (userId, displayName, color) persisted in `sessionStorage` under `collab-identity`. PT-BR display name = random `{adjective} {animal}` (12×12 = 144 combinations like "Coruja Sagaz", "Raposa Ágil"). 8-color cursor palette.
+  - Emits `join` on connect, `leave` on unmount/mapId-change/disabled.
+  - `mousemove` on window → world coords via store viewport → `cursor:move` (throttled via `requestAnimationFrame` to ~30-60fps).
+  - Listens for `presence:update`, `cursor:move`, `node:update`, `node:add`, `node:delete`, `edge:add`, `edge:delete`.
+  - Returns `{ connected, users, remoteCursors, socket, identity }` where `remoteCursors` excludes self.
+  - **Feedback-loop prevention**: `suppressingEmitRef` flag set around remote-applied store mutations; Zustand fires subscribers synchronously during `set`, so the local diff subscriber sees the flag and skips re-emit. After the mutation returns, `snapshotStore()` refreshes the diff baseline and the flag is cleared.
+  - Local store changes are diffed against a per-id snapshot (Map<id, MapNode>) and emitted via microtask-batched `scheduleEmit` (one flush per tick).
+- Created `src/components/mindmap/RemoteCursors.tsx`:
+  - Renders remote cursors as absolutely-positioned floating divs over the canvas.
+  - Each cursor: colored arrow/pin SVG (with drop-shadow) + colored pill label with display name (truncated to 140px max-width).
+  - Position: `screenX = worldX * zoom + viewport.x`, `screenY = worldY * zoom + viewport.y` — read live from `useMindMapStore`.
+  - Framer Motion `animate` on `x/y` for spring-based smooth interpolation (stiffness 500, damping 40). When `reducedMotion` is on (Settings → Performance), snaps instead of animating.
+  - `AnimatePresence` for enter/exit fade.
+  - Off-screen cursors (>200px outside viewport) are skipped for perf.
+  - Container is `pointer-events: none` + `z-40` so it overlays but never blocks canvas interactions.
+- Edited `src/lib/settings.ts`:
+  - Added `collab: boolean` to the `editor` category in `FeatureSettings` interface (with comment "real-time collaboration (presence + cursors)").
+  - Default `false` in `DEFAULT_SETTINGS.editor.collab` (off by default to avoid overhead).
+  - Added toggle metadata to `SETTING_CATEGORIES.editor.toggles`: `{ key: "collab", label: "Colaboração em tempo real", description: "Mostra cursores de outros utilizadores a editar o mesmo mapa (requer serviço de collab ativo)." }`.
+  - No need to bump settings-store persist version — the existing version-3 deep-merge migration already covers new boolean fields in the editor category.
+- Started the mini-service in background: `cd /home/z/my-project/mini-services/collab-service && (bun run dev > /tmp/collab-service.log 2>&1 &)`.
+- Verified:
+  - `cat /tmp/collab-service.log` → `collab-service listening on 3003 / socket.io path: / / cors: *` ✓
+  - `pgrep -af "bun --hot index.ts"` → PID 2598 ✓
+  - `curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:3003/socket.io/?EIO=4&transport=polling"` → HTTP 200 ✓
+- Ran `bun run lint` → exit 0, 0 errors, 0 warnings ✓ (pre-existing tsc errors in MapEdges.tsx, NodeEditor.tsx, use-toast-notify.ts untouched and acknowledged).
+
+Stage Summary:
+- **Mini-service** `mini-services/collab-service/` (independent bun project, port 3003) — handles presence roster, cursor throttling, and fan-out for node/edge mutations per `room:<mapId>`.
+- **Frontend hook** `src/hooks/use-collab.ts` — lazy socket.io-client, identity persistence, rAF-throttled cursor emission, microtask-batched local-change emission, suppress-flag feedback-loop prevention.
+- **Component** `src/components/mindmap/RemoteCursors.tsx` — animated SVG arrow cursors with colored name pills, position computed from world coords × viewport transform.
+- **Settings toggle** added under Editor category: "Colaboração em tempo real" (default off).
+- **Lint clean** ✓, **mini-service running on port 3003** ✓ (PID 2598, HTTP 200 on socket.io polling endpoint).
+- **Files created**: `mini-services/collab-service/package.json`, `mini-services/collab-service/index.ts`, `mini-services/collab-service/README.md`, `src/hooks/use-collab.ts`, `src/components/mindmap/RemoteCursors.tsx`, `agent-ctx/9-C-full-stack-developer.md`.
+- **Files modified**: `src/lib/settings.ts` (added `collab: boolean` field + default + toggle metadata).
+- **Did NOT touch** (per task constraints): `src/app/page.tsx`, `src/components/mindmap/MindMapCanvas.tsx`, main project's `package.json`.
+- Socket.io event protocol: see `mini-services/collab-service/README.md` for full client↔server table.
+
+---
+Task ID: 9-B
+Agent: full-stack-developer
+Task: Implement read-only share link feature for mind maps.
+
+Work Log:
+- Read worklog.md (Tasks 0–17 + 9-init complete; ~1656 lines). Prior agents built a full mind-map app with Prisma + SQLite, Zustand store, shadcn/ui, ~30 feature toggles. The "share read-only link" feature was explicitly listed as a recommended next step in the Task 17 stage summary.
+- Read prisma/schema.prisma, src/app/api/maps/[id]/route.ts (GET/PUT/DELETE pattern), src/app/api/maps/[id]/star/route.ts (PATCH toggle pattern), src/components/mindmap/Toolbar.tsx, src/components/mindmap/MindMapCanvas.tsx (980 lines), src/app/page.tsx (332 lines), src/hooks/use-toast-notify.ts (toast API), src/components/ui/{dialog,alert-dialog,switch}.tsx.
+- Verified `@paralleldrive/cuid2` is NOT installed (per package.json + node_modules check) — used `crypto.randomUUID()` (with dashes stripped → 32-char hex token) as fallback per task spec.
+- **Schema change**: Added `shareId String? @unique` field to `MindMap` model in prisma/schema.prisma. Ran `bun run db:push` (succeeded with a warning about the new unique constraint) and `bun run db:generate` to regenerate the Prisma client.
+- **API routes created**:
+  1. `src/app/api/maps/[id]/share/route.ts` — GET returns current shareId; POST handles `{enabled:true|false}` (enable/revoke) and `{rotate:true}` (force-generate new token). Returns `{shareId, url}` where url is built from the request Host header.
+  2. `src/app/api/share/[shareId]/route.ts` — PUBLIC endpoint (no auth) that returns the full map (id, title, description, theme, nodes, edges) in the same shape as `GET /api/maps/[id]` so `loadMap()` works. 404 if not found.
+- **ShareDialog component** (`src/components/mindmap/ShareDialog.tsx`):
+  - Props: `{ open, onClose, mapId }`.
+  - On open, fetches `GET /api/maps/[id]/share` to load current shareId.
+  - Switch toggle to enable/disable sharing. "Regenerar link" button with AlertDialog confirmation. Copy button uses `navigator.clipboard.writeText` with a 2s "Copiado" check state.
+  - Read-only note: "Qualquer pessoa com este link pode ver o mapa (apenas leitura)".
+  - Uses lucide icons: Share2, Copy, Check, Link2, RefreshCw, Eye, Lock, Loader2.
+  - Uses `useToastNotify` from `@/hooks/use-toast-notify` (verified export shape: `const { toast } = useToastNotify(); toast({ title, description?, variant? })`).
+- **MindMapCanvas.tsx surgical edits** — added `readOnly?: boolean` prop (default false). When true:
+  - `handleCanvasPointerDown`: forces pan-mode behavior (viewers can still pan the canvas by dragging empty space).
+  - `handleNodePointerDown`: early-returns (no node dragging).
+  - `handleConnectHandle`: early-returns (no connecting).
+  - `handleDoubleClick`: early-returns (no add-node / no open-editor).
+  - `handleNodeContextMenu`: suppresses the edit context menu.
+  - Keyboard shortcuts handler: early-returns (no undo/redo/delete/duplicate/fit-to-view/etc).
+  - Cursor: always `grab`/`grabbing` (pan mode).
+  - Hidden UI elements: empty-state hint, connection-mode indicators, selection-info badge.
+- **Toolbar.tsx surgical edits** — added `onOpenShare` prop and a new Share button (lucide `Share2` icon) positioned between Exportar and Configurações. Button only renders when `mapId` is set (gated by reading `mapId` from the store). Tooltip: "Partilhar".
+- **page.tsx surgical edits**:
+  - Added imports for `ShareDialog`, `Eye`, `LogOut` icons.
+  - Added 3 new state vars: `readOnly`, `shareOpen`, `shareMapId`.
+  - Modified the init `useEffect` to first check `window.location.search` for `?share=XXX`. If present, fetches `GET /api/share/XXX`, calls `loadMap(...)`, sets `readOnly=true`, and skips the normal "create/load first map" flow.
+  - Added `handleOpenShare` callback (gated on `!readOnly`) and `handleExitReadOnly` (clears the `?share=` query param via `window.location.replace(url)`).
+  - Disabled the Ctrl+K / Ctrl+F keyboard shortcuts when `readOnly`.
+  - Rendered a read-only banner at the top: "Modo de visualização (apenas leitura)" with an Eye icon and a "Sair" button (LogOut icon).
+  - Wrapped every editing UI element in `{!readOnly && ...}`: Toolbar, FloatingToolbar, NodeEditor, AIPanel, SettingsPanel, ExportPanel, TemplatesPanel, Sidebar, ShortcutsPanel, CommandPalette, SearchPanel, OnboardingTour, ShareDialog.
+  - Passed `readOnly={readOnly}` to MindMapCanvas.
+  - Simplified the footer in read-only mode (no Templates / Exportar buttons, just "Visualização pública" label).
+- **Critical dev-server issue encountered and resolved**:
+  - After running `bun run db:push`, the dev server's PrismaClient singleton (cached on `globalThis.prisma` since the dev server started BEFORE the schema change) was still using the OLD schema — calling `db.mindMap.findUnique({ select: { shareId: true } })` returned `Unknown field 'shareId'` (500 error).
+  - First attempt: Added a schema-version stamp to `lib/db.ts` (`PRISMA_SCHEMA_VERSION` + `__prismaSchemaVersion` on globalForPrisma). When the version mismatches, the singleton is disconnected and recreated. This successfully reset the singleton BUT the PrismaClient class itself (loaded from the `@prisma/client` external module by Turbopack at startup) was still the OLD class with the OLD schema. HMR can't invalidate Turbopack external modules.
+  - Final fix: Killed the stale next dev process (PID 1014) and restarted `bun run dev` via `setsid` (detached, survives shell exit). New dev server picked up the regenerated Prisma client. Verified `shareId` now appears in SQL queries: `SELECT \`main\`.\`MindMap\`.\`shareId\`, ...`.
+  - Kept the schema-version stamp in `lib/db.ts` as a safety net for future schema changes (will auto-recreate the singleton on HMR if the version mismatches — useful when only the lib/db.ts module is reloaded, not the @prisma/client external).
+- **Smoke tests via curl** — all endpoints verified:
+  - `POST /api/maps/{id}/share {enabled:true}` → 200, returns shareId + URL ✓
+  - `GET /api/maps/{id}/share` → 200, returns `{shareId: "..."}` ✓
+  - `POST /api/maps/{id}/share {rotate:true}` → 200, returns new shareId ✓
+  - `GET /api/share/{shareId}` → 200, returns full map (id, title, description, theme, nodes, edges) ✓
+  - `GET /api/share/DOESNOTEXIST` → 404 `{error: "Map not found"}` ✓
+  - `POST /api/maps/{id}/share {enabled:false}` → 200, returns `{shareId: null, url: ""}` ✓
+  - `GET /` and `GET /?share=XXX` → 200 (page renders in both editor and read-only modes) ✓
+- **Lint**: `bun run lint` → 0 errors, 0 warnings ✓ (pre-existing tsc errors in MapEdges.tsx, NodeEditor.tsx, use-toast-notify.ts are unaffected and ignored per task spec).
+- **Dev server**: Restarted via setsid; running on port 3000, HTTP 200 on / and /api routes.
+
+Stage Summary:
+- **Files created**:
+  - `src/app/api/maps/[id]/share/route.ts` (140 lines) — GET + POST share management endpoints
+  - `src/app/api/share/[shareId]/route.ts` (45 lines) — public read-only map fetch endpoint
+  - `src/components/mindmap/ShareDialog.tsx` (~330 lines) — shadcn Dialog + AlertDialog + Switch + Input with copy-to-clipboard and rotate-link confirmation
+- **Files modified**:
+  - `prisma/schema.prisma` — added `shareId String? @unique` to MindMap model
+  - `src/lib/db.ts` — added schema-version stamp to auto-invalidate the PrismaClient singleton on schema changes (resolves the dev-mode HMR caching issue that was preventing the new field from being recognized)
+  - `src/components/mindmap/MindMapCanvas.tsx` — added `readOnly?: boolean` prop; gated all mutating interactions (drag, connect, double-click-add, context menu, keyboard shortcuts, selection info badges, empty-state hint, connection indicators)
+  - `src/components/mindmap/Toolbar.tsx` — added `onOpenShare` prop, `mapId` from store, and a Share2 icon button between Exportar and Configurações (visible only when a map is loaded)
+  - `src/app/page.tsx` — added `?share=XXX` query-param detection on mount, `readOnly` state, read-only banner ("Modo de visualização (apenas leitura)" + "Sair" button), ShareDialog wiring (`shareOpen`/`shareMapId` state), gated all editing UI behind `{!readOnly && ...}`, simplified footer in read-only mode
+- **Feature behavior**:
+  1. **Editor mode**: User clicks the Share2 icon in the toolbar → ShareDialog opens → fetches current shareId → toggle Switch to enable → share URL appears in read-only Input with Copy button → "Regenerar link" button (with AlertDialog confirm) rotates the shareId, invalidating the old URL → toggle Switch off to revoke.
+  2. **Viewer mode**: Anyone with the share URL visits `/?share=XXX` → page fetches `GET /api/share/XXX` → loads map via `loadMap()` → enters read-only mode (banner at top, no Toolbar/FloatingToolbar/panels/shortcuts, canvas allows pan+zoom only) → "Sair" button clears the query param and reloads in editor mode.
+- **Constraints honored**: No new page routes (only `/`), no mini-services modifications, no package.json changes, `import { db } from '@/lib/db'` used throughout, `z-ai-web-dev-sdk` not touched, Portuguese (pt-BR) UI labels throughout.
+- **Lint status**: 0 errors, 0 warnings ✓
+- **Dev server**: Running on port 3000 (restarted to pick up Prisma schema change), HTTP 200 ✓

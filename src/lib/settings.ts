@@ -39,6 +39,7 @@ export interface FeatureSettings {
     historyLimit: number; // max history steps
     confirmDelete: boolean; // confirm before deleting
     alignmentGuides: boolean; // show alignment / snap guides when dragging nodes
+    collab: boolean; // real-time collaboration (presence + cursors)
   };
   // ── Performance ─────────────────────────────────────
   performance: {
@@ -96,6 +97,7 @@ export const DEFAULT_SETTINGS: FeatureSettings = {
     historyLimit: 50,
     confirmDelete: true,
     alignmentGuides: true,
+    collab: false,
   },
   performance: {
     maxNodes: 500,
@@ -179,6 +181,7 @@ export const SETTING_CATEGORIES: SettingCategoryMeta[] = [
       { key: "multiSelect", label: "Multi-seleção", description: "Selecionar vários nós com Shift." },
       { key: "undoRedo", label: "Desfazer/Refazer", description: "Histórico de ações." },
       { key: "confirmDelete", label: "Confirmar exclusão", description: "Pede confirmação ao excluir." },
+      { key: "collab", label: "Colaboração em tempo real", description: "Mostra cursores de outros utilizadores a editar o mesmo mapa (requer serviço de collab ativo)." },
     ],
   },
   {

@@ -157,9 +157,16 @@ function computeAlignmentGuides(
 interface Props {
   onOpenNodeEditor: () => void;
   onOpenAIPanel: () => void;
+  /**
+   * When true, the canvas becomes a read-only viewer: no drag, no connect,
+   * no double-click-add, no context menu, no keyboard shortcuts that mutate
+   * state. Wheel-zoom and pan-via-empty-canvas-click remain enabled so viewers
+   * can still navigate the shared map.
+   */
+  readOnly?: boolean;
 }
 
-export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
+export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragType, setDragType] = useState<"node" | "pan" | "box" | null>(null);
@@ -248,6 +255,25 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.target !== containerRef.current && !(e.target as HTMLElement).dataset?.canvas) return;
+      // Read-only mode: only allow panning via empty-canvas drag (so viewers
+      // can navigate the shared map). All other interactions (box-select,
+      // deselect, connect) are disabled.
+      if (readOnly) {
+        // Force pan-mode behavior in read-only mode.
+        dragRef.current = {
+          type: "pan",
+          startX: e.clientX,
+          startY: e.clientY,
+          vpStartX: viewport.x,
+          vpStartY: viewport.y,
+          nodeStartX: 0,
+          nodeStartY: 0,
+        };
+        setIsDragging(true);
+        setDragType("pan");
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        return;
+      }
       if (tool === "pan") {
         dragRef.current = {
           type: "pan",
@@ -284,18 +310,23 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       setConnectingFrom(null);
       setCursorWorld(null);
     },
-    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld, multiSelect]
+    [tool, viewport, clearSelection, setConnectingFrom, setCursorWorld, multiSelect, readOnly]
   );
 
   // Node right-click handler — open context menu
   const handleNodeContextMenu = useCallback(
     (e: React.MouseEvent, id: string) => {
+      if (readOnly) {
+        // Suppress context menu in read-only mode (no edit actions available).
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       selectNodes(id, false);
       setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
     },
-    [selectNodes]
+    [selectNodes, readOnly]
   );
 
   // Context menu callbacks
@@ -371,6 +402,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   const handleNodePointerDown = useCallback(
     (e: React.PointerEvent, id: string) => {
       e.stopPropagation();
+      // Read-only mode: no node dragging, no connecting.
+      if (readOnly) return;
       if (tool === "connect") {
         if (connectingFrom) {
           addEdge(connectingFrom, id);
@@ -398,18 +431,19 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       setIsDragging(true);
       setDragType("node");
     },
-    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode]
+    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode, readOnly]
   );
 
   // Connect handle pointer down
   const handleConnectHandle = useCallback(
     (e: React.PointerEvent, id: string) => {
+      if (readOnly) return;
       e.stopPropagation();
       setConnectingFrom(id);
       const world = screenToWorld(e.clientX, e.clientY);
       setCursorWorld(world);
     },
-    [screenToWorld, setConnectingFrom, setCursorWorld]
+    [screenToWorld, setConnectingFrom, setCursorWorld, readOnly]
   );
 
   // Compute visible nodes: hide descendants of collapsed nodes.
@@ -617,6 +651,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
   // Double click on canvas — add node. Double click on node → open editor.
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Read-only mode: no double-click actions (no add-node, no open-editor).
+      if (readOnly) return;
       const target = e.target as HTMLElement;
       const isCanvasBg = target === containerRef.current || !!target.dataset?.canvas;
       if (!isCanvasBg) {
@@ -642,12 +678,17 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       focusNode(id);
       onOpenNodeEditor();
     },
-    [screenToWorld, addNode, snap, focusNode, onOpenNodeEditor, selectNodes]
+    [screenToWorld, addNode, snap, focusNode, onOpenNodeEditor, selectNodes, readOnly]
   );
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Read-only mode: skip all mutating keyboard shortcuts (the only ones
+      // remaining useful are undo/redo, fit-to-view, and search — but in
+      // read-only share mode we disable all of them to avoid confusing the
+      // viewer with no-op actions).
+      if (readOnly) return;
       // Skip if user is typing in an input/textarea/contenteditable
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
@@ -720,7 +761,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor, readOnly]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
@@ -773,15 +814,17 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
       className={`relative flex-1 overflow-hidden ${bgClass}`}
       style={{
         cursor:
-          isDragging && dragType === "pan"
-            ? "grabbing"
-            : tool === "pan"
-              ? "grab"
-              : tool === "connect"
-                ? "crosshair"
-                : isDragging
-                  ? "grabbing"
-                  : "default",
+          readOnly
+            ? (isDragging && dragType === "pan" ? "grabbing" : "grab")
+            : isDragging && dragType === "pan"
+              ? "grabbing"
+              : tool === "pan"
+                ? "grab"
+                : tool === "connect"
+                  ? "crosshair"
+                  : isDragging
+                    ? "grabbing"
+                    : "default",
       }}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handlePointerMove}
@@ -894,8 +937,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         </AnimatePresence>
       </div>
 
-      {/* Empty state hint */}
-      {nodes.length === 0 && !isDragging && (
+      {/* Empty state hint — hidden in read-only share mode (no editing hints for viewers) */}
+      {nodes.length === 0 && !isDragging && !readOnly && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center max-w-md px-6">
             <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center relative">
@@ -921,15 +964,15 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         </div>
       )}
 
-      {/* Connection mode indicator */}
-      {tool === "connect" && !connectingFrom && (
+      {/* Connection mode indicator — hidden in read-only mode (no connecting) */}
+      {!readOnly && tool === "connect" && !connectingFrom && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
             Clique em um nó para iniciar a conexão
           </div>
         </div>
       )}
-      {connectingFrom && (
+      {!readOnly && connectingFrom && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
             Clique em outro nó para completar a conexão · Esc para cancelar
@@ -950,8 +993,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel }: Props) {
         />
       )}
 
-      {/* Selection info badge when multiple nodes selected */}
-      {selectedNodeIds.length > 1 && !isDragging && (
+      {/* Selection info badge — hidden in read-only mode */}
+      {!readOnly && selectedNodeIds.length > 1 && !isDragging && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-card/95 border border-border text-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />

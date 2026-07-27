@@ -27,6 +27,7 @@ import {
   CircleDot,
   Workflow,
   ScanLine,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -48,6 +49,7 @@ interface Props {
   onOpenExport: () => void;
   onOpenSearch: () => void;
   onOpenNodeEditor: () => void;
+  onOpenShare: () => void;
 }
 
 // Keyboard shortcut tooltip map
@@ -79,7 +81,7 @@ function ToolTipBadge({ shortcut }: { shortcut: string }) {
   );
 }
 
-export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor }: Props) {
+export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor, onOpenShare }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const pushHistory = useMindMapStore((s) => s.pushHistory);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
   const viewport = useMindMapStore((s) => s.viewport);
+  const mapId = useMindMapStore((s) => s.mapId);
 
   const undoRedoEnabled = useSettingsStore((s) => s.settings.editor.undoRedo);
   const aiEnabled = useSettingsStore((s) => s.settings.ai.enabled);
@@ -396,6 +399,21 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenExport} data-tooltip="Exportar (⤓)">
           <Download className="h-4 w-4" />
         </Button>
+        {/* Share button — only show when a map is loaded (not in read-only mode).
+            The page.tsx wrapper hides the entire Toolbar in read-only mode,
+            but we also gate on mapId here for safety. */}
+        {mapId && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 transition-colors toolbar-btn"
+            onClick={onOpenShare}
+            data-tooltip="Partilhar"
+            aria-label="Partilhar mapa"
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenSettings} data-tooltip="Configurações (⚙)">
           <Settings2 className="h-4 w-4" />
         </Button>

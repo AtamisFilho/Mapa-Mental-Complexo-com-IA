@@ -324,8 +324,8 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           </div>
           <div className="min-w-0 flex-1">
             <p
-              className="text-[14px] font-bold leading-snug break-words tracking-tight"
-              style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}
+              className="node-title-text text-[15px] font-semibold leading-snug break-words tracking-tight"
+              style={{ color: "var(--foreground)", letterSpacing: "-0.012em" }}
             >
               {node.title}
             </p>
@@ -352,7 +352,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           )}
         </div>
         {!node.collapsed && node.content && (
-          <p className="pl-1.5 text-[12px] leading-relaxed text-muted-foreground line-clamp-3 break-words" style={{ opacity: 0.88 }}>
+          <p className="node-desc-text pl-1.5 text-[12.5px] leading-relaxed text-foreground/75 line-clamp-3 break-words">
             {node.content}
           </p>
         )}

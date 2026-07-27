@@ -17,6 +17,7 @@ model MindMap {
   theme       String   @default("emerald")
   tags        String?  // comma-separated
   starred     Boolean  @default(false)
+  shareId     String?  @unique  // public read-only share token (cuid)
   nodes       Node[]
   edges       Edge[]
   createdAt   DateTime @default(now())
