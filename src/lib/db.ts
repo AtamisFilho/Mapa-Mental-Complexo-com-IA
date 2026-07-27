@@ -34,7 +34,11 @@ if (
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'],
+    // Em produção: só erros. Em dev: warnings + erros (sem flood de queries).
+    log:
+      process.env.NODE_ENV === 'production'
+        ? ['error']
+        : ['warn', 'error'],
   })
 
 if (process.env.NODE_ENV !== 'production') {

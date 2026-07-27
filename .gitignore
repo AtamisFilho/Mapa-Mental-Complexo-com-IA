@@ -56,3 +56,11 @@ server.log
 # Internal tool artifacts (not source code)
 /tool-results/
 /agent-ctx/
+/download/
+/.zscripts/
+
+# SQLite database files (never commit — user data)
+/db/*.db
+/db/*.db-journal
+/db/*.db-wal
+/db/*.db-shm

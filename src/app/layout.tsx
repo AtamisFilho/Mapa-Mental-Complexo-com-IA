@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  ),
   title: "Mapa Mental Complexo com IA",
   description:
     "Editor de mapas mentais complexos com inteligência artificial. Controle granular de features, temas, e capacidades de IA.",

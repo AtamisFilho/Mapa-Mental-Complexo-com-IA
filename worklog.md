@@ -1920,3 +1920,48 @@ Stage Summary:
 - **Artefatos criados**: Dockerfile, docker-entrypoint.sh, railway.json (x2), .env.example, DEPLOY.md
 - **Mudanças de código**: collab-service port dinâmico, use-collab URL dinâmica, next.config limpo
 - **Próximo passo**: usuário segue DEPLOY.md (15 min) para publicar o app
+
+---
+Task ID: 11-pg-docker-pwa
+Agent: main (orchestrator)
+Task: Migrar para PostgreSQL + Docker Compose compartilhado + PWA para teste offline no PC/Android
+
+Work Log:
+- Estratégia híbrida: PostgreSQL (produção) + SQLite fallback (sandbox sem Docker)
+
+## 1. Migração PostgreSQL (com fallback SQLite)
+- prisma/schema.prisma: provider sqlite → postgresql
+- prisma/schema.sqlite.prisma: clone com provider sqlite (dev/sandbox)
+- scripts/db-generate.mjs + db-push.mjs: auto-detectam banco pela DATABASE_URL
+- package.json: scripts inteligentes + postinstall hook
+- Dev server sandbox continua funcional com SQLite
+
+## 2. Docker Compose (PostgreSQL compartilhado)
+- docker-compose.yml: postgres + web + collab
+- docker/postgres-init/01-create-databases.sh: cria bancos para OUTROS projetos
+- Rede 'mindmap-network' compartilhada entre Docker projects
+
+## 3. PWA (installable + offline)
+- src/app/manifest.ts: manifest route com 4 ícones + 2 atalhos
+- public/sw.js: Service Worker com 3 estratégias de cache
+- 7 ícones gerados via z-ai + sharp (192/512/maskable/apple-touch/favicon)
+- src/components/pwa/ServiceWorkerRegister.tsx: registra SW em produção
+- src/app/layout.tsx: meta tags PWA completas + lang pt-BR
+
+## 4. DEPLOY.md reescrito: 3 cenários (Docker Compose / Railway / Offline PWA)
+
+## QA final
+- Lint: 0 erros ✓
+- /manifest.webmanifest: 200 ✓
+- /sw.js: 200 ✓
+- Ícones: 200 ✓
+- Página: 200 ✓
+
+## Push e PR
+- Commit bd557de pushed para branch round9
+- PR #1 atualizado: 22 commits, 268 ficheiros, +27,988 linhas
+- URL: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/pull/1
+
+Stage Summary:
+- ✅ PostgreSQL + Docker Compose + PWA completos e pushed
+- ✅ Usuário pode agora seguir DEPLOY.md (opção A) para instalar no PC
