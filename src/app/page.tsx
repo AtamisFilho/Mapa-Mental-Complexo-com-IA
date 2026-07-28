@@ -222,6 +222,13 @@ export default function Home() {
         const next = themeMode === "dark" ? "light" : themeMode === "light" ? "system" : "dark";
         setThemeMode(next);
       }
+      // Ctrl+B → toggle star/favorite on the current map. The Toolbar's star
+      // button handles the actual API call; we just click it programmatically.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+        e.preventDefault();
+        const starBtn = document.querySelector<HTMLButtonElement>('[aria-label="Adicionar aos favoritos"], [aria-label="Remover dos favoritos"]');
+        starBtn?.click();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

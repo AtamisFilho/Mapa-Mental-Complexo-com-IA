@@ -26,6 +26,7 @@ import {
   ScanSearch,
   Focus,
   BarChart3,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -100,6 +101,41 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
   const viewport = useMindMapStore((s) => s.viewport);
   const mapId = useMindMapStore((s) => s.mapId);
+
+  // Starred flag for the current map — toggled via the Star button or the
+  // Ctrl+B shortcut. Persists to the server via PATCH /api/maps/[id]/star.
+  const [starred, setStarred] = useState(false);
+  const [starLoading, setStarLoading] = useState(false);
+  // Fetch the current starred state when mapId changes.
+  useEffect(() => {
+    if (!mapId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/maps/${mapId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setStarred(!!data?.map?.starred);
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mapId]);
+  const handleToggleStar = useCallback(async () => {
+    if (!mapId || starLoading) return;
+    setStarLoading(true);
+    try {
+      const res = await fetch(`/api/maps/${mapId}/star`, { method: "PATCH" });
+      if (res.ok) {
+        const data = await res.json();
+        setStarred(!!data?.map?.starred);
+      }
+    } catch {
+      /* silent */
+    }
+    setStarLoading(false);
+  }, [mapId, starLoading]);
 
   const undoRedoEnabled = useSettingsStore((s) => s.settings.editor.undoRedo);
   const aiEnabled = useSettingsStore((s) => s.settings.ai.enabled);
@@ -354,6 +390,21 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenExport} data-tooltip="Exportar (⤓)">
           <Download className="h-4 w-4" />
         </Button>
+        {/* Star/Favorite button — toggles the starred flag on the current map.
+            Persisted to the server via PATCH /api/maps/[id]/star. */}
+        {mapId && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 transition-colors toolbar-btn ${starred ? "text-amber-500" : ""}`}
+            onClick={handleToggleStar}
+            data-tooltip={starred ? "Remover dos favoritos (Ctrl+B)" : "Adicionar aos favoritos (Ctrl+B)"}
+            aria-label={starred ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            disabled={starLoading}
+          >
+            <Star className={`h-4 w-4 ${starred ? "fill-amber-500" : ""} ${starLoading ? "animate-pulse" : ""}`} />
+          </Button>
+        )}
         {/* Share button — only show when a map is loaded (not in read-only mode).
             The page.tsx wrapper hides the entire Toolbar in read-only mode,
             but we also gate on mapId here for safety. */}
