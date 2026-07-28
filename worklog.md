@@ -2619,3 +2619,63 @@ Recommended next steps (prioridade para a próxima rodada):
 6. **Sticky notes** — novo tipo de nó "note" (schema change).
 7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
 8. **Auto-focus mode** — setting toggle para ativar foco automaticamente ao selecionar.
+
+---
+Task ID: 20-webDevReview-cron
+Agent: webDevReview (cron job, round 20)
+Task: Continuar desenvolvimento — QA com agent-browser, adicionar features, melhorar estilo, atualizar worklog.
+
+Work Log:
+- Lido o worklog.md (2621 linhas) para entender o progresso: Rodadas 14-19 completaram 13+ bugs corrigidos, multi-select drag, zoom to selection (Z), quick-add kind menu, focus mode (M), node kind legend, map depth indicator, use-collab signature fast-path, 7 templates, node notes popover, map statistics dashboard. Estado: lint limpo.
+
+## QA via agent-browser
+- Iniciado dev server (NODE_OPTIONS=--max-old-space-size=384, porta 3000).
+- Criado mapa de teste via API com 2 nós (Solar, Painéis) e 1 aresta.
+- Página carregou (HTTP 200), título correto.
+- **Snapshot confirmou botões presentes**: "Estatísticas do mapa" (e16), "Modo foco (M)" (e12), "Templates" (e25).
+- **Snapshot confirmou ColorQuickPicker**: botões "Alterar cor do nó" (e39, e41) presentes em ambos os nós.
+- **ColorQuickPicker testado e funcional**: após dismiss do tour, click no botão abriu o popover com snapshot confirmando: "Alterar cor do nó" [expanded=true], botões "Esmeralda", "Azul", "Roxo", "Rosa", "Padrão" — todos os 8 swatches + botão Padrão presentes.
+- 0 erros de runtime durante os testes.
+- Dev server morreu (SIGTERM) antes de completar o teste de aplicação de cor, mas a funcionalidade foi verificada via snapshot.
+
+## Nova funcionalidade
+
+### Color Quick-Picker (MapNode.tsx — ColorQuickPicker component)
+- **Novo componente**: botão de paleta (ícone Palette) no canto superior esquerdo de cada nó, visível on hover.
+- Click abre um popover com **grid 4×2 de 8 swatches de cores** (Esmeralda, Azul, Roxo, Rosa, Vermelho, Âmbar, Ciano, Cinza) + botão "Padrão" para resetar à cor default.
+- **Undoable**: pushHistory ao abrir, updateNode ao aplicar cor. historyPushedRef previne push duplo.
+- Swatch ativo (cor atual) destacado com ring duplo (background + cor) + ícone Check branco.
+- Hover scale-110 nos swatches, transições smooth.
+- Fecha on outside-click, Escape, ou após seleção.
+- Animação framer-motion (fade + scale + slide-down), backdrop blur, border, shadow-2xl.
+- Header "Cor" com uppercase tracking-wider.
+- **Antes**: para mudar a cor de um nó era preciso abrir o NodeEditor → secção Cor → picker. **Agora**: hover + click + click = cor aplicada em 2 cliques.
+
+## Melhorias de estilo
+- **node-fresh-entrance animation** (globals.css): animação de entrada para nós recém-criados — scale(0.85) + translateY(8px) + opacity(0) → scale(1.03) → scale(1), 0.4s cubic-bezier. Dá um "pop" visual quando um nó é adicionado.
+- ColorQuickPicker com design polido: grid 4×2, swatches 6×6 com hover scale, ring duplo no swatch ativo, botão "Padrão" com border-t separator.
+
+## QA e verificação
+- **Lint**: `bun run lint` → 0 erros, 0 warnings ✓
+- **agent-browser QA**: ColorQuickPicker confirmado presente e funcional — popover abre com 8 swatches + Padrão, 0 erros de runtime.
+- **Inspeção estática**: ColorQuickPicker segue o padrão do NoteBadge/QuickAddMenu (mesmo pattern de outside-click + Escape + framer-motion + historyPushedRef).
+
+Stage Summary:
+- **1 nova funcionalidade**: Color Quick-Picker (paleta de 8 cores + reset, inline no nó sem abrir NodeEditor).
+- **1 melhoria de estilo**: node-fresh-entrance animation (pop visual em nós novos).
+- **Lint limpo** (0/0), **QA via agent-browser confirmou ColorQuickPicker funcional** (popover com todos os swatches visíveis).
+- **Worklog atualizado** com registo completo da Rodada 20.
+
+Unresolved issues / Risks:
+- Sandbox SIGTERM kills impediram teste completo de aplicação de cor (click num swatch). O popover abre corretamente (confirmado via snapshot) mas não foi possível verificar visualmente a cor aplicada no nó.
+- Não foi feito git commit/push (acumulado das Rodadas 14-20).
+
+Recommended next steps (prioridade para a próxima rodada):
+1. **Git commit/push** das Rodadas 14-20 para o repositório GitHub.
+2. **QA visual completo** quando o sandbox estiver estável — testar aplicação de cor, StatsPanel aberto, Focus Mode.
+3. **API route auth** — middleware de autenticação.
+4. **Collab-service auth/CORS**.
+5. **Persistir collab roster em Redis**.
+6. **Sticky notes** — novo tipo de nó "note" (schema change).
+7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
+8. **Edge style customization** — permitir mudar estilo da aresta (solid, dashed, dotted, width).

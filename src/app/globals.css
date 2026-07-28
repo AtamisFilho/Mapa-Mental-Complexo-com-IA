@@ -239,6 +239,26 @@
   box-shadow: 0 0 0 2px var(--primary), 0 0 24px 4px var(--ring);
 }
 
+/* Fresh node entrance — subtle scale + fade-in for newly created nodes.
+   Applied via the `node-fresh-entrance` class (toggled by the useIsFresh hook). */
+.node-fresh-entrance {
+  animation: node-fresh-entrance-anim 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes node-fresh-entrance-anim {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(8px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(-1px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Node title — subtle text-shadow for crispness against busy canvas backgrounds
    and improved contrast in both light and dark modes. */
 .node-title-text {

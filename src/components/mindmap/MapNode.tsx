@@ -22,6 +22,8 @@ import {
   Plus,
   StickyNote,
   X,
+  Palette,
+  Check,
 } from "lucide-react";
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -409,6 +411,13 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           <NoteBadge nodeId={node.id} note={node.note} accentColor={accentColor} />
         )}
 
+        {/* Color quick-picker — small palette button at top-left (on hover).
+            Click opens a row of 8 color swatches for instant color changes
+            without opening the NodeEditor. */}
+        {!node.collapsed && (
+          <ColorQuickPicker nodeId={node.id} currentColor={node.color} accentColor={accentColor} />
+        )}
+
         {/* #10: Connect handle — larger (h-6 w-6), smooth transition, ring animation when connect tool active */}
         <button
           aria-label="Conectar a partir deste nó"
@@ -690,6 +699,142 @@ function NoteBadge({
             <div className="px-2.5 py-1 border-t border-border bg-muted/30 text-[9px] text-muted-foreground">
               Esc para fechar · Ctrl+Enter para salvar
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── ColorQuickPicker ───────────────────────────────────────────────────────
+// Small palette button at the top-left of a node (visible on hover). Click
+// opens a horizontal grid of 8 color swatches — clicking a swatch instantly
+// sets the node's color. Includes a "clear" option to reset to the default
+// accent color. This avoids opening the NodeEditor just to change a color.
+
+const QUICK_COLORS = [
+  { name: "Esmeralda", value: "#10b981" },
+  { name: "Azul", value: "#3b82f6" },
+  { name: "Roxo", value: "#8b5cf6" },
+  { name: "Rosa", value: "#ec4899" },
+  { name: "Vermelho", value: "#f43f5e" },
+  { name: "Âmbar", value: "#f59e0b" },
+  { name: "Ciano", value: "#14b8a6" },
+  { name: "Cinza", value: "#64748b" },
+];
+
+function ColorQuickPicker({
+  nodeId,
+  currentColor,
+  accentColor,
+}: {
+  nodeId: string;
+  currentColor: string | null | undefined;
+  accentColor: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const updateNode = useMindMapStore((s) => s.updateNode);
+  const pushHistory = useMindMapStore((s) => s.pushHistory);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const historyPushedRef = useRef(false);
+
+  const commitAndClose = useCallback(() => {
+    historyPushedRef.current = false;
+    setOpen(false);
+  }, []);
+
+  // Close on outside-click.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        commitAndClose();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") commitAndClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, commitAndClose]);
+
+  const applyColor = (color: string | null) => {
+    if (!historyPushedRef.current) {
+      pushHistory();
+      historyPushedRef.current = true;
+    }
+    updateNode(nodeId, { color });
+    commitAndClose();
+  };
+
+  return (
+    <div ref={pickerRef} className="absolute top-1 left-1 z-40">
+      <button
+        aria-label="Alterar cor do nó"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open) historyPushedRef.current = true;
+          setOpen((v) => !v);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex h-5 w-5 items-center justify-center rounded-full transition-all hover:scale-110"
+        style={{
+          background: currentColor ? `${currentColor}30` : `${accentColor}20`,
+          color: currentColor ?? accentColor,
+        }}
+        title="Alterar cor"
+      >
+        <Palette className="h-3 w-3" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-7 left-0 p-2 rounded-lg border border-border bg-popover/95 backdrop-blur-xl shadow-2xl"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-1 mb-1.5 pb-1.5 border-b border-border">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Cor</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {QUICK_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  aria-label={c.name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    applyColor(c.value);
+                  }}
+                  className="h-6 w-6 rounded-md transition-transform hover:scale-110 flex items-center justify-center"
+                  style={{
+                    background: c.value,
+                    boxShadow: currentColor === c.value ? `0 0 0 2px var(--background), 0 0 0 4px ${c.value}` : "none",
+                  }}
+                  title={c.name}
+                >
+                  {currentColor === c.value && <Check className="h-3 w-3 text-white drop-shadow" />}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                applyColor(null);
+              }}
+              className="mt-1.5 w-full flex items-center justify-center gap-1 py-1 rounded-md text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors border-t border-border pt-1.5"
+            >
+              <X className="h-3 w-3" />
+              Padrão
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
