@@ -45,6 +45,8 @@ export function Sidebar({ open, onClose }: Props) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<View>("maps");
+  // Filter toggle: when true, only starred maps are shown in the list.
+  const [starredOnly, setStarredOnly] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [creatingFromTemplate, setCreatingFromTemplate] = useState<string | null>(null);
@@ -223,8 +225,10 @@ export function Sidebar({ open, onClose }: Props) {
 
   const filtered = maps.filter(
     (m) =>
-      m.title.toLowerCase().includes(search.toLowerCase()) ||
-      (m.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
+      // Starred filter: when enabled, only show starred maps
+      (!starredOnly || m.starred) &&
+      (m.title.toLowerCase().includes(search.toLowerCase()) ||
+        (m.description?.toLowerCase().includes(search.toLowerCase()) ?? false))
   );
 
   if (!open) return null;
@@ -309,7 +313,7 @@ export function Sidebar({ open, onClose }: Props) {
           {/* MAPS VIEW */}
           {view === "maps" && (
             <>
-              {/* search + new */}
+              {/* search + star filter + new */}
               <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border bg-muted/20">
                 <div className="flex-1 relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -320,10 +324,28 @@ export function Sidebar({ open, onClose }: Props) {
                     className="h-8 pl-8 text-xs"
                   />
                 </div>
+                {/* Star filter toggle — when active, only starred maps are shown */}
+                <Button
+                  variant={starredOnly ? "default" : "ghost"}
+                  size="icon"
+                  className={`h-8 w-8 shrink-0 ${starredOnly ? "text-amber-500" : ""}`}
+                  onClick={() => setStarredOnly((v) => !v)}
+                  title={starredOnly ? "Mostrar todos os mapas" : "Mostrar apenas favoritos"}
+                  aria-pressed={starredOnly}
+                >
+                  <Star className={`h-4 w-4 ${starredOnly ? "fill-amber-500" : ""}`} />
+                </Button>
                 <Button size="icon" className="h-8 w-8" onClick={handleNewMap} title="Novo mapa vazio">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {/* Starred filter indicator */}
+              {starredOnly && (
+                <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-amber-500" />
+                  Mostrando apenas favoritos · {filtered.length} de {maps.length}
+                </div>
+              )}
               {/* list */}
               <ScrollArea className="flex-1 px-2">
                 {loading && (

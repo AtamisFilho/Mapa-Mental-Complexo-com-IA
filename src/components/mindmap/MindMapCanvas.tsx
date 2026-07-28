@@ -8,7 +8,7 @@ import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
 import { useToastNotify } from "@/hooks/use-toast-notify";
 import { NODE_KIND_META } from "@/lib/settings";
-import type { NodeKind } from "@/lib/types";
+import type { NodeKind, EdgeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
 import { NodeContextMenu } from "./NodeContextMenu";
@@ -232,6 +232,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const duplicateNode = useMindMapStore((s) => s.duplicateNode);
   const selectNodes = useMindMapStore((s) => s.selectNode);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+  const selectedEdgeIds = useMindMapStore((s) => s.selectedEdgeIds);
+  const updateEdge = useMindMapStore((s) => s.updateEdge);
+  const pushHistoryForEdge = useMindMapStore((s) => s.pushHistory);
   // Reparent (Task 16-B)
   const reparentTargetId = useMindMapStore((s) => s.reparentTargetId);
   const draggedNodeId = useMindMapStore((s) => s.draggedNodeId);
@@ -896,6 +899,22 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         toggleFocusMode();
         return;
       }
+      // Cycle edge kind (T) — when an edge is selected, pressing T cycles its
+      // kind through related → causes → supports → contradicts → depends → related.
+      // Each kind has a distinct color and dash pattern (see EDGE_KIND_META).
+      if (k === "t" && selectedEdgeIds.length > 0) {
+        e.preventDefault();
+        const EDGE_KINDS: EdgeKind[] = ["related", "causes", "supports", "contradicts", "depends"];
+        pushHistoryForEdge();
+        for (const eid of selectedEdgeIds) {
+          const edge = edges.find((e2) => e2.id === eid);
+          if (!edge) continue;
+          const curIdx = EDGE_KINDS.indexOf(edge.kind);
+          const nextKind = EDGE_KINDS[(curIdx + 1) % EDGE_KINDS.length];
+          updateEdge(eid, { kind: nextKind });
+        }
+        return;
+      }
       // Add node shortcuts: C/P/A/I/R/O
       const keyMap: Record<string, NodeKind> = {
         c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
@@ -952,7 +971,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, selectAll, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
+  }, [undoRedo, undo, redo, selectedNodeIds, selectedEdgeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, selectAll, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges, updateEdge, pushHistoryForEdge]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
