@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
@@ -20,6 +20,8 @@ import {
   FileText,
   MoreHorizontal,
   Plus,
+  StickyNote,
+  X,
 } from "lucide-react";
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -400,6 +402,13 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           </span>
         )}
 
+        {/* Note badge — small sticky-note icon at top-right when the node has
+            a note. Clicking it opens a popover to view/edit the note inline,
+            without needing to open the full NodeEditor. */}
+        {node.note && !node.collapsed && (
+          <NoteBadge nodeId={node.id} note={node.note} accentColor={accentColor} />
+        )}
+
         {/* #10: Connect handle — larger (h-6 w-6), smooth transition, ring animation when connect tool active */}
         <button
           aria-label="Conectar a partir deste nó"
@@ -547,6 +556,139 @@ function QuickAddMenu({
                   </button>
                 );
               })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── NoteBadge ──────────────────────────────────────────────────────────────
+// Small sticky-note icon shown at the top-right of nodes that have a `note`.
+// Clicking it opens a popover with the note text and an inline textarea to
+// edit it — saves on blur or Escape. This avoids opening the full NodeEditor
+// panel just to peek at or tweak a note.
+
+function NoteBadge({
+  nodeId,
+  note,
+  accentColor,
+}: {
+  nodeId: string;
+  note: string;
+  accentColor: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(note);
+  const updateNode = useMindMapStore((s) => s.updateNode);
+  const pushHistory = useMindMapStore((s) => s.pushHistory);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyPushedRef = useRef(false);
+
+  // Reset draft when the note changes externally.
+  useEffect(() => {
+    setDraft(note);
+  }, [note]);
+
+  // Focus the textarea when the popover opens.
+  useEffect(() => {
+    if (open && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [open]);
+
+  const commitAndClose = useCallback(() => {
+    if (historyPushedRef.current) {
+      updateNode(nodeId, { note: draft.trim() || null });
+      historyPushedRef.current = false;
+    }
+    setOpen(false);
+  }, [updateNode, nodeId, draft]);
+
+  // Close on outside-click.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (badgeRef.current && !badgeRef.current.contains(e.target as Node)) {
+        commitAndClose();
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, draft, commitAndClose]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      commitAndClose();
+    }
+    // Ctrl/Cmd+Enter also commits.
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      commitAndClose();
+    }
+  };
+
+  return (
+    <div ref={badgeRef} className="absolute top-1 right-1 z-40">
+      <button
+        aria-label="Ver/editar nota"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open) {
+            historyPushedRef.current = true;
+            pushHistory();
+          }
+          setOpen((v) => !v);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex h-5 w-5 items-center justify-center rounded-full transition-all hover:scale-110"
+        style={{ background: `${accentColor}20`, color: accentColor }}
+        title="Ver/editar nota"
+      >
+        <StickyNote className="h-3 w-3" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-7 right-0 w-52 rounded-lg border border-border bg-popover/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border bg-gradient-to-r from-amber-500/10 to-transparent">
+              <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <StickyNote className="h-3 w-3 text-amber-500" />
+                Nota
+              </span>
+              <button
+                aria-label="Fechar nota"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  commitAndClose();
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={commitAndClose}
+              placeholder="Escreva uma nota…"
+              className="w-full px-2.5 py-2 text-xs bg-transparent resize-none outline-none min-h-[60px] max-h-[120px] leading-relaxed"
+            />
+            <div className="px-2.5 py-1 border-t border-border bg-muted/30 text-[9px] text-muted-foreground">
+              Esc para fechar · Ctrl+Enter para salvar
             </div>
           </motion.div>
         )}

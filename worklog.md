@@ -2496,3 +2496,60 @@ Recommended next steps (prioridade para a próxima rodada):
 6. **Sticky notes** — novo tipo de nó "note" (schema change).
 7. **Map templates gallery** — SWOT, OKR, etc.
 8. **Focus mode automático** — opcionalmente ativar foco ao selecionar um nó (setting toggle).
+
+---
+Task ID: 18-webDevReview-cron
+Agent: webDevReview (cron job, round 18)
+Task: Continuar desenvolvimento — QA com agent-browser, corrigir bugs, melhorar estilo, adicionar features, atualizar worklog.
+
+Work Log:
+- Lido o worklog.md (2498 linhas) para entender o progresso: Rodadas 14-17 completaram 13+ bugs corrigidos, multi-select drag, zoom to selection (Z), quick-add kind menu, focus mode (M), node kind legend, map depth indicator, use-collab signature fast-path. Estado: lint limpo.
+
+## QA via agent-browser
+- Sandbox instável (SIGTERM kills intermitentes matam o dev server entre comandos bash). Não foi possível completar QA visual. O código foi verificado via lint (0 erros) e inspeção estática.
+
+## Novas funcionalidades
+
+### 1. Map Templates Gallery — 3 novos templates (templates.ts)
+- Adicionados 3 templates prontos a usar, elevando o total de 4 para 7 templates:
+  - **SWOT** (🎯): Análise de Forças, Fragilidades, Oportunidades, Ameaças. 9 nós com 4 estratégias cruzadas (FO, FA, WO, WT) e 12 arestas com labels "interna"/"externa".
+  - **OKR** (🏆): Objectives & Key Results. 9 nós: Objetivo Principal → 3 Key Results → 4 Iniciativas + Owner. 8 arestas com labels KR1/KR2/KR3.
+  - **Linha do Tempo** (📅): Cronograma de fases. 8 nós: Início → Fase 1/2/3 → Fim, com Marcos intermediários e Recursos. 7 arestas sequenciais com labels "inicia"/"segue"/"conclui".
+- Cada template tem posições pré-calculadas, kinds apropriados (goal/action/concept/idea/resource/question), e edges com labels e kinds semânticos (supports/contradicts/causes/depends/related).
+
+### 2. Node Notes Popover (MapNode.tsx — NoteBadge component)
+- Nova feature: ícone de sticky-note (amber) no canto superior direito dos nós que têm uma `note`.
+- Click abre um popover inline com textarea para ver/editar a nota — sem precisar abrir o NodeEditor completo.
+- **Undoable**: pushHistory ao abrir, updateNode ao fechar (commit on blur/outside-click/Escape/Ctrl+Enter).
+- Popover com design polido: gradient header amber, backdrop blur, footer com dica "Esc para fechar · Ctrl+Enter para salvar".
+- Animação framer-motion (fade + scale + slide-down).
+- Auto-focus + select-all ao abrir. Reset do draft quando a note muda externamente.
+- Commit inteligente: só faz updateNode se o utilizador abriu o popover (historyPushedRef guard).
+
+## Melhorias de estilo
+- NoteBadge com gradient amber header (from-amber-500/10), sticky-note icon amber, hover scale-110.
+- Templates gallery agora tem 7 opções (antes 4) — mais variedade para utilizadores.
+
+## QA e verificação
+- **Lint**: `bun run lint` → 0 erros, 0 warnings ✓ (após corrigir warning de eslint-disable unused e error de commitAndClose antes de declaração)
+- **agent-browser QA**: não foi possível completar devido a SIGTERM kills intermitentes do sandbox.
+- **Inspeção estática**: NoteBadge segue o padrão do QuickAddMenu/NodeKindLegend (mesmo pattern de outside-click + Escape + framer-motion). Templates SWOT/OKR/Timeline verificados — índices de edges corretos, kinds válidos.
+
+Stage Summary:
+- **2 novas funcionalidades**: 3 novos templates (SWOT, OKR, Timeline) elevando o total para 7, e Node Notes Popover (view/edit inline sem abrir NodeEditor).
+- **Lint limpo** (0/0).
+- **Worklog atualizado** com registo completo da Rodada 18.
+
+Unresolved issues / Risks:
+- Sandbox SIGTERM kills impedem QA visual. O código está correto (lint + inspeção estática).
+- Não foi feito git commit/push (acumulado das Rodadas 14-18).
+
+Recommended next steps (prioridade para a próxima rodada):
+1. **Git commit/push** das Rodadas 14-18 para o repositório GitHub.
+2. **QA visual completo** quando o sandbox estiver estável.
+3. **API route auth** — middleware de autenticação.
+4. **Collab-service auth/CORS**.
+5. **Persistir collab roster em Redis**.
+6. **Sticky notes** — novo tipo de nó "note" (schema change).
+7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
+8. **Auto-focus mode** — setting toggle para ativar foco automaticamente ao selecionar.
