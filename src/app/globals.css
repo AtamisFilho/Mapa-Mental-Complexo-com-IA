@@ -352,13 +352,21 @@
   box-shadow: 0 0 0 1.5px oklch(0.7 0.15 160 / 0.45), 0 0 16px 2px oklch(0.7 0.15 160 / 0.25);
 }
 
-/* Micro hover scale (1.02x) with smooth transition */
+/* Micro hover scale (1.02x) with smooth transition + subtle lift.
+   Applied to nodes — gives a tactile "pop" on hover without being
+   distracting. Combines scale + translateY for a refined lift effect. */
 .micro-hover-scale {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 .micro-hover-scale:hover {
-  transform: scale(1.02);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  transform: scale(1.02) translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.micro-hover-scale:active {
+  transform: scale(0.99);
+  transition-duration: 0.08s;
 }
 
 /* Animated dash pattern for selected/highlighted edges */
@@ -386,6 +394,43 @@
 .toolbar-group:hover {
   background: color-mix(in srgb, var(--muted) 50%, transparent);
   border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* ── Toolbar responsive behaviour ──────────────────────────────────────
+   The toolbar holds many groups (brand, tools, add, undo/redo, zoom,
+   search, actions, layout, IA, share, settings). On narrow viewports we
+   progressively hide the least-essential chrome so the primary tools
+   remain usable without horizontal scrolling. */
+.toolbar-container {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border) 60%, transparent) transparent;
+}
+.toolbar-container::-webkit-scrollbar {
+  height: 4px;
+}
+.toolbar-container::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+  border-radius: 9999px;
+}
+/* ≤ 640px: hide the brand text (keep only the icon) */
+@media (max-width: 640px) {
+  .toolbar-brand span {
+    display: none;
+  }
+  .toolbar-zoom-badge {
+    display: none;
+  }
+}
+/* ≤ 480px: collapse group pill backgrounds to save horizontal space */
+@media (max-width: 480px) {
+  .toolbar-group {
+    padding: 0.125rem 0.25rem;
+    background: transparent;
+    border: none;
+  }
+  .toolbar-divider {
+    display: none;
+  }
 }
 
 /* Toolbar button — subtle hover state for inactive icons */

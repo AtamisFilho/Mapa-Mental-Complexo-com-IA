@@ -23,6 +23,7 @@ import {
   Copy,
   LayoutGrid,
   Share2,
+  ScanSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -82,6 +83,7 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
   const zoomBy = useMindMapStore((s) => s.zoomBy);
   const resetViewport = useMindMapStore((s) => s.resetViewport);
   const fitToView = useMindMapStore((s) => s.fitToView);
+  const fitSelection = useMindMapStore((s) => s.fitSelection);
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const past = useMindMapStore((s) => s.past);
@@ -282,6 +284,10 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => fitToView(80)} data-tooltip={`Ajustar à tela (${SHORTCUT_MAP.fitToView})`}>
           <Maximize className="h-4 w-4" />
+        </Button>
+        {/* Zoom to selection — fits viewport to the currently selected node(s) */}
+        <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={() => fitSelection(selectedNodeIds, 80)} data-tooltip="Zoom à seleção (Z)" disabled={selectedNodeIds.length === 0}>
+          <ScanSearch className="h-4 w-4" />
         </Button>
         {/* Layout panel trigger — opens the dedicated LayoutPanel with all 10 layouts */}
         <Button

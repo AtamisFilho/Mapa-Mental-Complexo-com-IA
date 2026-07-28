@@ -76,6 +76,7 @@ interface MindMapState {
   setHovered: (id: string | null) => void;
   focusNode: (id: string) => void;
   fitToView: (padding?: number) => void;
+  fitSelection: (nodeIds: string[], padding?: number) => void;
   toggleCollapse: (id: string) => void;
   organizeLayout: () => void;
   applyLayout: (layoutType: LayoutType) => void;
@@ -407,6 +408,49 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     // Compute zoom but clamp so it stays readable
     const rawZoom = Math.min(availW / contentW, availH / contentH);
     const zoom = Math.min(2, Math.max(0.35, rawZoom));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    set({
+      viewport: {
+        x: winW / 2 - cx * zoom,
+        y: canvasCenterY - cy * zoom,
+        zoom,
+      },
+    });
+  },
+
+  fitSelection: (nodeIds, padding = 80) => {
+    // Zoom & pan to fit only the given nodes (the current selection). Falls
+    // back to fitToView when the selection is empty. Used by the `Z` shortcut
+    // ("zoom to selection") so users can quickly focus on a sub-tree.
+    const all = get().nodes;
+    const sel = nodeIds.length > 0 ? all.filter((n) => nodeIds.includes(n.id)) : all;
+    if (sel.length === 0) {
+      get().fitToView(padding);
+      return;
+    }
+    const xs = sel.map((n) => n.x);
+    const ys = sel.map((n) => n.y);
+    const x2s = sel.map((n) => n.x + n.width);
+    const y2s = sel.map((n) => n.y + n.height);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...x2s);
+    const maxY = Math.max(...y2s);
+    const contentW = Math.max(1, maxX - minX);
+    const contentH = Math.max(1, maxY - minY);
+    const winW = typeof window !== "undefined" ? window.innerWidth : 1200;
+    const winH = typeof window !== "undefined" ? window.innerHeight : 700;
+    const toolbarH = 44;
+    const bottomH = 60;
+    const canvasTop = toolbarH;
+    const canvasH = Math.max(200, winH - toolbarH - bottomH);
+    const canvasCenterY = canvasTop + canvasH / 2;
+    const availW = Math.max(200, winW - padding * 2);
+    const availH = Math.max(150, canvasH - padding * 2);
+    const rawZoom = Math.min(availW / contentW, availH / contentH);
+    // Allow higher max zoom for selections (single node → zoom 2.5x for detail).
+    const zoom = Math.min(2.5, Math.max(0.4, rawZoom));
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     set({

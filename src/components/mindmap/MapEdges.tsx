@@ -19,6 +19,54 @@ function bez(sx: number, sy: number, tx: number, ty: number) {
   return `M ${sx} ${sy} C ${mid} ${sy}, ${mid} ${ty}, ${tx} ${ty}`;
 }
 
+/**
+ * Compute the intersection point of a line from (sx,sy) to (tx,ty) with the
+ * border of a rectangle centered at (tx,ty) with the given half-width /
+ * half-height. Returns the point ON the rectangle's edge so an arrowhead
+ * drawn there sits just outside the node instead of being hidden behind it.
+ *
+ * We trace the line backwards from the target center toward the source and
+ * find the first border it crosses (Liang-Barsky style clipping).
+ */
+function edgeBorderPoint(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+  halfW: number,
+  halfH: number,
+  inset = 2
+) {
+  const dx = sx - tx;
+  const dy = sy - ty;
+  if (dx === 0 && dy === 0) return { x: tx, y: ty };
+  // Scale factors to reach each border from the center.
+  const scaleX = dx !== 0 ? (halfW - inset) / Math.abs(dx) : Infinity;
+  const scaleY = dy !== 0 ? (halfH - inset) / Math.abs(dy) : Infinity;
+  const s = Math.min(scaleX, scaleY);
+  return { x: tx + dx * s, y: ty + dy * s };
+}
+
+/** Compute the intersection of the SOURCE side too, so the bezier starts at
+ *  the source node's border rather than its center (cleaner visual). */
+function sourceBorderPoint(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+  halfW: number,
+  halfH: number,
+  inset = 2
+) {
+  const dx = tx - sx;
+  const dy = ty - sy;
+  if (dx === 0 && dy === 0) return { x: sx, y: sy };
+  const scaleX = dx !== 0 ? (halfW - inset) / Math.abs(dx) : Infinity;
+  const scaleY = dy !== 0 ? (halfH - inset) / Math.abs(dy) : Infinity;
+  const s = Math.min(scaleX, scaleY);
+  return { x: sx + dx * s, y: sy + dy * s };
+}
+
 // Compute tangent angle at the end of the bezier curve (for arrowhead direction)
 // For cubic bezier M sx,sy C mid,sy mid,ty tx,ty:
 // The tangent at t=1 is the direction from the last control point (mid, ty) to the endpoint (tx, ty)
@@ -142,17 +190,31 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
         const s = nodeMap.get(e.sourceId);
         const t = nodeMap.get(e.targetId);
         if (!s || !t) return null;
-        const sx = s.x + s.width / 2;
-        const sy = s.y + (s.height ?? 72) / 2;
-        const tx = t.x + t.width / 2;
-        const ty = t.y + (t.height ?? 72) / 2;
+        const sHalfW = s.width / 2;
+        const sHalfH = (s.height ?? 72) / 2;
+        const tHalfW = t.width / 2;
+        const tHalfH = (t.height ?? 72) / 2;
+        // Raw centers
+        const scx = s.x + sHalfW;
+        const scy = s.y + sHalfH;
+        const tcx = t.x + tHalfW;
+        const tcy = t.y + tHalfH;
+        // Trim the line to each node's border so the arrowhead is visible
+        // (previously it was drawn at the target CENTER, hidden behind it).
+        const src = sourceBorderPoint(scx, scy, tcx, tcy, sHalfW, sHalfH);
+        const dst = edgeBorderPoint(scx, scy, tcx, tcy, tHalfW, tHalfH);
+        const sx = src.x;
+        const sy = src.y;
+        const tx = dst.x;
+        const ty = dst.y;
         const meta = EDGE_KIND_META[e.kind as keyof typeof EDGE_KIND_META] ?? EDGE_KIND_META.related;
         const isSelected = selectedEdgeIds.includes(e.id);
         // Edge is "connected to selected node" if either source or target is selected
         const isNodeConnected = selectedNodeSet.has(e.sourceId) || selectedNodeSet.has(e.targetId);
         const angle = endAngle(sx, sy, tx, ty);
-        // Arrowhead position: slightly before the target center
-        const arrowSize = 6;
+        // Arrowhead position: at the trimmed target border point.
+        // Size bumped from 7 → 9 for better visibility at lower zoom levels.
+        const arrowSize = 9;
         const arrowX = tx;
         const arrowY = ty;
         return {
@@ -290,7 +352,9 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             className={p.selected ? "edge-animated-dash" : undefined}
             style={{ transition: "stroke-width 0.15s ease, opacity 0.15s ease" }}
           />
-          {/* Arrowhead indicator at target end */}
+          {/* Arrowhead indicator at target end — drawn AFTER the path so it
+              sits on top, with a subtle white stroke for contrast against
+              any background. */}
           <polygon
             points={(() => {
               const s = p.arrowSize;
@@ -305,7 +369,10 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
               return `${tipX},${tipY} ${p1x},${p1y} ${p2x},${p2y}`;
             })()}
             fill={p.color}
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.9 : 0.75}
+            stroke="white"
+            strokeWidth={0.5}
+            strokeOpacity={0.6}
+            opacity={p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
             style={{ transition: "opacity 0.15s ease" }}
           />
           {/* Edge label with pill background, hover scale + brighter, contrasting text outline */}

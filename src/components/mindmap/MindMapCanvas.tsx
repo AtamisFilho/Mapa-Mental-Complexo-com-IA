@@ -190,6 +190,11 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     nodeStartY: number;
     vpStartX: number;
     vpStartY: number;
+    // Multi-select drag: records the starting position of every selected
+    // node so they all move together when the dragged node moves. The
+    // dragged node itself is also included here (its entry is the source
+    // of truth for the snap calculations).
+    groupStart?: Array<{ id: string; x: number; y: number }>;
   } | null>(null);
 
   const { toast } = useToastNotify();
@@ -249,6 +254,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const fitToView = useMindMapStore((s) => s.fitToView);
+  const fitSelection = useMindMapStore((s) => s.fitSelection);
 
   // Convert screen coords to world coords
   const screenToWorld = useCallback(
@@ -457,6 +463,17 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
       if (!node) return;
       pushHistory();
       setDraggedNode(id); // Task 16-B: mark node as being dragged
+      // Multi-select drag: if the pointer-down node is part of the current
+      // selection (and there is more than one selected node), capture the
+      // starting positions of ALL selected nodes so they move as a group.
+      // Clicking a non-selected node falls back to single-node behaviour
+      // (the click also selects just that node via the MapNode onClick).
+      const groupStart =
+        selectedNodeIds.length > 1 && selectedNodeIds.includes(id)
+          ? nodes
+              .filter((n) => selectedNodeIds.includes(n.id))
+              .map((n) => ({ id: n.id, x: n.x, y: n.y }))
+          : undefined;
       dragRef.current = {
         type: "node",
         nodeId: id,
@@ -466,11 +483,12 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         nodeStartY: node.y,
         vpStartX: 0,
         vpStartY: 0,
+        groupStart,
       };
       setIsDragging(true);
       setDragType("node");
     },
-    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode, readOnly]
+    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode, readOnly, selectedNodeIds]
   );
 
   // Connect handle pointer down
@@ -580,7 +598,24 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           setActiveGuides([]);
         }
 
+        // Apply the new position to the primary dragged node.
         updateNode(d.nodeId, { x: newX, y: newY });
+
+        // Multi-select drag: move every other selected node by the same
+        // world-space delta. We use the captured groupStart positions so the
+        // relative layout between selected nodes is preserved. Snap is applied
+        // per-node to respect grid settings.
+        if (d.groupStart && d.groupStart.length > 1) {
+          const primaryStart = d.groupStart.find((g) => g.id === d.nodeId);
+          if (primaryStart) {
+            const deltaX = newX - primaryStart.x;
+            const deltaY = newY - primaryStart.y;
+            for (const g of d.groupStart) {
+              if (g.id === d.nodeId) continue; // already updated above
+              updateNode(g.id, { x: snap(g.x + deltaX), y: snap(g.y + deltaY) });
+            }
+          }
+        }
 
         // ── Reparent detection (Task 16-B) ────────────────────────────────
         // Check if the dragged node's center overlaps with another node's
@@ -822,6 +857,15 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         fitToView(80);
         return;
       }
+      // Zoom to selection (Z) — fits the viewport to the currently selected
+      // node(s). If nothing is selected, falls back to fitToView.
+      if (e.key === "z" || e.key === "Z") {
+        if (!(e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          fitSelection(selectedNodeIds, 80);
+          return;
+        }
+      }
       // Add node shortcuts: C/P/A/I/R/O
       const keyMap: Record<string, NodeKind> = {
         c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
@@ -879,7 +923,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
@@ -1072,7 +1116,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">L</kbd> Conectar</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">Z</kbd> Zoom seleção</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> Buscar</span>
             </div>
             <p className="text-[11px] text-muted-foreground/70 italic">
