@@ -259,6 +259,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const focusMode = useMindMapStore((s) => s.focusMode);
   const focusNodeIds = useMindMapStore((s) => s.focusNodeIds);
   const toggleFocusMode = useMindMapStore((s) => s.toggleFocusMode);
+  const cycleHighlight = useMindMapStore((s) => s.cycleHighlight);
+  const searchMatchesCount = useMindMapStore((s) => s.searchMatches.length);
   const focusNodeSet = useMemo(() => new Set(focusNodeIds), [focusNodeIds]);
 
   // Convert screen coords to world coords
@@ -857,6 +859,15 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
       }
       if (!shortcutsEnabled) return;
       const k = e.key.toLowerCase();
+      // Cycle search matches: Ctrl+G (next), Ctrl+Shift+G (previous).
+      // Only fires when there are active search matches.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+        if (searchMatchesCount > 0) {
+          e.preventDefault();
+          cycleHighlight(e.shiftKey ? -1 : 1);
+        }
+        return;
+      }
       // Fit to view
       if (e.key === "f" || e.key === "F") {
         e.preventDefault();
@@ -934,7 +945,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
@@ -1164,6 +1175,16 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
             >
               ✕
             </button>
+          </div>
+        </div>
+      )}
+      {/* Search match counter — shows when there are active search matches.
+          Displays "N resultados" and hints for Ctrl+G to cycle. */}
+      {!readOnly && searchMatchesCount > 0 && !focusMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="flex items-center gap-2 bg-amber-500/90 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in backdrop-blur-sm">
+            <span className="font-bold">{searchMatchesCount}</span>
+            <span>resultados · Ctrl+G para navegar</span>
           </div>
         </div>
       )}

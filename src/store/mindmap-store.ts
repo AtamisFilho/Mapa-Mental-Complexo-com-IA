@@ -109,6 +109,7 @@ interface MindMapState {
   setSearchQuery: (q: string) => void;
   setSearchMatches: (ids: string[]) => void;
   setHighlightedMatch: (id: string | null) => void;
+  cycleHighlight: (direction: 1 | -1) => void;
   toggleFocusMode: () => void;
   searchNodes: (
     query: string,
@@ -821,6 +822,25 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchMatches: (ids) => set({ searchMatches: ids }),
   setHighlightedMatch: (id) => set({ highlightedMatchId: id }),
+
+  // Cycle the highlighted search match forward (direction=1) or backward
+  // (direction=-1). Used by Ctrl+G / Ctrl+Shift+G to jump between matches
+  // without re-opening the search panel. Also focuses the new match so the
+  // viewport scrolls to it.
+  cycleHighlight: (direction) => {
+    const { searchMatches, highlightedMatchId } = get();
+    if (searchMatches.length === 0) return;
+    const curIdx = highlightedMatchId
+      ? searchMatches.indexOf(highlightedMatchId)
+      : -1;
+    let nextIdx = curIdx + direction;
+    if (nextIdx < 0) nextIdx = searchMatches.length - 1;
+    if (nextIdx >= searchMatches.length) nextIdx = 0;
+    const nextId = searchMatches[nextIdx];
+    set({ highlightedMatchId: nextId, selectedNodeIds: [nextId] });
+    // Focus the new match so the viewport centers on it.
+    get().focusNode(nextId);
+  },
 
   toggleFocusMode: () => {
     const state = get();
