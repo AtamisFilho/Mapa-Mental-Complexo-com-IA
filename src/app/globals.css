@@ -1,0 +1,781 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.99 0.005 145);
+  --foreground: oklch(0.18 0.02 160);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 160);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 160);
+  --primary: oklch(0.62 0.15 160);
+  --primary-foreground: oklch(0.99 0.01 160);
+  --secondary: oklch(0.96 0.01 160);
+  --secondary-foreground: oklch(0.25 0.02 160);
+  --muted: oklch(0.96 0.01 160);
+  --muted-foreground: oklch(0.5 0.02 160);
+  --accent: oklch(0.95 0.03 160);
+  --accent-foreground: oklch(0.25 0.02 160);
+  --destructive: oklch(0.6 0.22 25);
+  --border: oklch(0.9 0.01 160);
+  --input: oklch(0.92 0.01 160);
+  --ring: oklch(0.62 0.15 160);
+  --chart-1: oklch(0.65 0.2 160);
+  --chart-2: oklch(0.7 0.18 40);
+  --chart-3: oklch(0.6 0.22 350);
+  --chart-4: oklch(0.7 0.17 280);
+  --chart-5: oklch(0.65 0.18 190);
+  --sidebar: oklch(0.985 0.005 160);
+  --sidebar-foreground: oklch(0.2 0.02 160);
+  --sidebar-primary: oklch(0.62 0.15 160);
+  --sidebar-primary-foreground: oklch(0.99 0.01 160);
+  --sidebar-accent: oklch(0.95 0.03 160);
+  --sidebar-accent-foreground: oklch(0.25 0.02 160);
+  --sidebar-border: oklch(0.9 0.01 160);
+  --sidebar-ring: oklch(0.62 0.15 160);
+
+  /* canvas-specific */
+  --canvas-bg: oklch(0.985 0.006 160);
+  --canvas-grid: oklch(0.85 0.01 160);
+  --canvas-grid-highlight: oklch(0.78 0.015 160);
+  --node-bg: oklch(1 0 0);
+  --node-border: oklch(0.88 0.01 160);
+  --node-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+  --node-hover-bg: oklch(0.98 0.01 160);
+  --edge-color: oklch(0.6 0.01 160);
+
+  /* panel & toolbar */
+  --panel-bg: oklch(1 0 0 / 85%);
+  --panel-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --toolbar-bg: oklch(0.99 0.005 160 / 92%);
+
+  /* accent gradient endpoints */
+  --gradient-start: oklch(0.62 0.15 160);
+  --gradient-end: oklch(0.7 0.18 190);
+}
+
+.dark {
+  --background: oklch(0.15 0.015 170);
+  --foreground: oklch(0.96 0.005 160);
+  --card: oklch(0.2 0.02 170);
+  --card-foreground: oklch(0.96 0.005 160);
+  --popover: oklch(0.2 0.02 170);
+  --popover-foreground: oklch(0.96 0.005 160);
+  --primary: oklch(0.7 0.16 160);
+  --primary-foreground: oklch(0.12 0.02 160);
+  --secondary: oklch(0.26 0.02 170);
+  --secondary-foreground: oklch(0.96 0.005 160);
+  --muted: oklch(0.26 0.02 170);
+  --muted-foreground: oklch(0.7 0.015 160);
+  --accent: oklch(0.3 0.03 160);
+  --accent-foreground: oklch(0.96 0.005 160);
+  --destructive: oklch(0.7 0.19 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.7 0.16 160);
+  --chart-1: oklch(0.7 0.2 160);
+  --chart-2: oklch(0.75 0.18 40);
+  --chart-3: oklch(0.65 0.22 350);
+  --chart-4: oklch(0.75 0.17 280);
+  --chart-5: oklch(0.7 0.18 190);
+  --sidebar: oklch(0.18 0.02 170);
+  --sidebar-foreground: oklch(0.96 0.005 160);
+  --sidebar-primary: oklch(0.7 0.16 160);
+  --sidebar-primary-foreground: oklch(0.12 0.02 160);
+  --sidebar-accent: oklch(0.26 0.02 170);
+  --sidebar-accent-foreground: oklch(0.96 0.005 160);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.7 0.16 160);
+
+  --canvas-bg: oklch(0.16 0.015 170);
+  --canvas-grid: oklch(0.32 0.015 170);
+  --canvas-grid-highlight: oklch(0.38 0.02 170);
+  --node-bg: oklch(0.22 0.02 170);
+  --node-border: oklch(0.34 0.015 170);
+  --node-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+  --node-hover-bg: oklch(0.28 0.02 170);
+  --edge-color: oklch(0.55 0.015 170);
+
+  /* panel & toolbar */
+  --panel-bg: oklch(0.18 0.02 170 / 88%);
+  --panel-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.2);
+  --toolbar-bg: oklch(0.17 0.018 170 / 90%);
+
+  /* accent gradient endpoints */
+  --gradient-start: oklch(0.7 0.16 160);
+  --gradient-end: oklch(0.75 0.18 190);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+/* ── Canvas backgrounds ──────────────────────────────── */
+
+/* Canvas dot grid background — softer, more visible dot pattern with subtle cross-hatch */
+.canvas-grid-bg {
+  background-color: var(--canvas-bg);
+  background-image:
+    radial-gradient(circle, var(--canvas-grid) 1.2px, transparent 1.2px),
+    repeating-linear-gradient(0deg, transparent, transparent 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27.3px, transparent 27.3px),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27px, color-mix(in srgb, var(--canvas-grid-highlight) 40%, transparent) 27.3px, transparent 27.3px);
+  background-size: 28px 28px, 28px 28px, 28px 28px;
+  background-position: 0 0, 0 0, 0 0;
+}
+
+/* Canvas gradient background — subtle layered gradient instead of dots */
+.canvas-gradient-bg {
+  background-color: var(--canvas-bg);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, oklch(0.62 0.08 160 / 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, oklch(0.7 0.08 190 / 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, oklch(0.65 0.06 40 / 0.04) 0%, transparent 50%);
+}
+
+.canvas-plain-bg {
+  background-color: var(--canvas-bg);
+}
+
+/* Canvas dots background — simple dot pattern without cross-hatch */
+.canvas-dots-bg {
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* ── Custom scrollbars — smoother appearance ─────────── */
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+.scroll-thin::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox scrollbar */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
+}
+
+/* ── Animated gradient text for the brand ─────────────── */
+/* 3-color gradient with smoother motion */
+.brand-gradient {
+  background: linear-gradient(120deg, var(--gradient-start), oklch(0.75 0.2 280), var(--gradient-end), var(--gradient-start));
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: brand-shimmer 8s ease-in-out infinite;
+}
+@keyframes brand-shimmer {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* ── Node glow on selection ──────────────────────────── */
+.node-glow {
+  box-shadow: 0 0 0 2px var(--primary), 0 0 24px 4px var(--ring);
+}
+
+/* Node title — subtle text-shadow for crispness against busy canvas backgrounds
+   and improved contrast in both light and dark modes. */
+.node-title-text {
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--background) 55%, transparent);
+}
+/* Node description — gentler shadow, keeps the body text legible without
+   overpowering the title hierarchy. */
+.node-desc-text {
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--background) 40%, transparent);
+}
+
+/* ── subtle pulsing accent dot ───────────────────────── */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1px solid var(--primary);
+  opacity: 0.6;
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ── fade-in utility ─────────────────────────────────── */
+.fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Markdown content inside AI chat / summaries ─────── */
+.prose-mm p { margin: 0.5em 0; line-height: 1.6; }
+.prose-mm h1, .prose-mm h2, .prose-mm h3 { font-weight: 600; margin: 0.8em 0 0.4em; }
+.prose-mm h1 { font-size: 1.15em; }
+.prose-mm h2 { font-size: 1.08em; }
+.prose-mm h3 { font-size: 1em; }
+.prose-mm ul, .prose-mm ol { margin: 0.4em 0; padding-left: 1.3em; }
+.prose-mm li { margin: 0.2em 0; line-height: 1.5; }
+.prose-mm code { background: var(--muted); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.88em; }
+.prose-mm strong { font-weight: 600; }
+.prose-mm blockquote { border-left: 3px solid var(--primary); padding-left: 0.8em; opacity: 0.85; margin: 0.5em 0; }
+
+/* ── New utility classes ──────────────────────────── */
+
+/* Node entrance pulse animation (scale + opacity, 2s ease-out) */
+.node-pulse {
+  animation: node-pulse-anim 2s ease-out forwards;
+}
+@keyframes node-pulse-anim {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* SVG-compatible glow filter reference (used inside <svg> elements) */
+.edge-glow {
+  filter: url(#edgeGlowFilter);
+}
+
+/* Animated glow ring for active toolbar buttons */
+.active-tool-ring {
+  box-shadow: 0 0 0 2px var(--primary), 0 0 10px 2px var(--ring);
+  animation: tool-ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tool-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 0 8px 1px var(--ring); }
+  50% { box-shadow: 0 0 0 2.5px var(--primary), 0 0 14px 3px var(--ring); }
+}
+
+/* Brand gradient focus border (for search bar and inputs) */
+.brand-gradient-focus:focus {
+  border-color: transparent;
+  border-image: linear-gradient(120deg, var(--primary), oklch(0.7 0.18 190), var(--primary)) 1;
+  outline: none;
+  box-shadow: 0 0 8px 1px var(--ring);
+}
+
+/* Styled badge/pill for counts — with subtle inner shadow */
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+.pill-badge--accent {
+  border-left: 3px solid var(--primary);
+  padding-left: 0.375rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Chain highlight glow for connected selected nodes */
+.chain-highlight {
+  box-shadow: 0 0 0 1.5px oklch(0.7 0.15 160 / 0.45), 0 0 16px 2px oklch(0.7 0.15 160 / 0.25);
+}
+
+/* Micro hover scale (1.02x) with smooth transition */
+.micro-hover-scale {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.micro-hover-scale:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* Animated dash pattern for selected/highlighted edges */
+.edge-animated-dash {
+  stroke-dashoffset: 0;
+  animation: edge-dash-flow 0.8s linear infinite;
+}
+@keyframes edge-dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+/* Toolbar group container */
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+/* Hover state on the group itself — subtle primary tint */
+.toolbar-group:hover {
+  background: color-mix(in srgb, var(--muted) 50%, transparent);
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* Toolbar button — subtle hover state for inactive icons */
+.toolbar-btn:hover:not(:disabled):not(.toolbar-btn--active) {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--foreground);
+}
+
+/* Active tool button — primary-tinted background + primary text */
+.toolbar-btn--active {
+  background: color-mix(in srgb, var(--primary) 15%, transparent) !important;
+  color: var(--primary) !important;
+  box-shadow: inset 0 -2px 0 0 var(--primary), 0 0 8px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* ── Tooltips (data-tooltip attribute) ──────────────────────────────────
+   Many toolbar / status-bar / footer buttons carry a `data-tooltip`
+   attribute but there was no CSS to render it, so hover hints were
+   completely invisible. This renders a lightweight, accessible tooltip
+   on hover and focus. */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  max-width: 240px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 9999;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* Tooltip appears ABOVE the element when the button sits at the bottom of
+   the viewport (e.g. footer buttons). Opt-in via data-tooltip-pos="top". */
+[data-tooltip-pos="top"]::after {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(4px);
+}
+[data-tooltip-pos="top"]:hover::after,
+[data-tooltip-pos="top"]:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── New utility classes (Task 5-a) ────────────────── */
+
+/* Glass panel — backdrop-blur with semi-transparent background and subtle border */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow: var(--panel-shadow);
+  border-radius: var(--radius-lg);
+}
+
+/* Node hover lift — smooth translateY(-2px) with enhanced shadow */
+.node-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.node-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.06);
+}
+
+/* Panel slide-in from the right */
+.panel-slide-in {
+  animation: panel-slide-in-anim 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes panel-slide-in-anim {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Toast slide-in from the bottom-right */
+.toast-slide-in {
+  animation: toast-slide-in-anim 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes toast-slide-in-anim {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Toast slide-out to the bottom-right */
+.toast-slide-out {
+  animation: toast-slide-out-anim 0.25s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+@keyframes toast-slide-out-anim {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+/* Edge type badge — small badge on edges showing the type */
+.edge-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--panel-bg);
+  color: var(--muted-foreground);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Shimmer animation for loading states */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--foreground) 6%, transparent) 50%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 1.8s ease-in-out infinite;
+}
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Toolbar divider — vertical separator in toolbar */
+.toolbar-divider {
+  width: 1px;
+  height: 1.25rem;
+  margin: 0 0.125rem;
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Context menu — glassmorphism styling for right-click menus */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  padding: 0.375rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--panel-shadow), 0 0 0 1px color-mix(in srgb, var(--border) 20%, transparent);
+  animation: context-menu-in 0.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.context-menu-item:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.context-menu-separator {
+  height: 1px;
+  margin: 0.25rem 0.375rem;
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+}
+@keyframes context-menu-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Context menu item — destructive (red) variant */
+.context-menu-item--destructive {
+  color: var(--destructive);
+}
+.context-menu-item--destructive:hover {
+  background: color-mix(in srgb, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+/* Context menu item — focused/selected via keyboard */
+.context-menu-item--focused {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Context menu shortcut label — right-aligned muted text */
+.context-menu-shortcut {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+/* Context menu color swatch — inline color picker within context menu */
+.context-menu-colors {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.375rem;
+  padding: 0.25rem 0.375rem;
+}
+
+/* Toolbar pulse ring — gentle pulsing shadow when node is selected */
+@keyframes toolbar-pulse-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 1px var(--primary), 0 4px 20px rgba(0,0,0,0.08), 0 0 8px 1px var(--ring);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--primary), 0 4px 24px rgba(0,0,0,0.12), 0 0 16px 3px var(--ring);
+  }
+}
+
+/* Context menu item icon container */
+.context-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ── Alignment guides (Task 14-C) ─────────────────── */
+
+/* SVG <line> elements used as snap guides while dragging nodes.
+   Drawn magenta dashed with a subtle opacity pulse so the user notices them. */
+.alignment-guide {
+  pointer-events: none;
+  animation: guide-pulse 0.8s ease-in-out infinite;
+}
+@keyframes guide-pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.5; }
+}
+
+/* Small badge shown next to a guide indicating the pixel distance
+   between the dragged node and the matched sibling along the axis. */
+.alignment-guide-badge {
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 600;
+  fill: #ffffff;
+}
+.alignment-guide-badge-bg {
+  pointer-events: none;
+  fill: #ec4899;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+  opacity: 0.95;
+}
+
+/* ── Visual polish (Task 15-A) ─────────────────────── */
+
+/* Glassmorphism node — backdrop-blur, top highlight, blend-mode overlay.
+   Applied to the inner card of MapNode for a premium "lifted" look. */
+.glass-node {
+  backdrop-filter: blur(8px) saturate(1.25);
+  -webkit-backdrop-filter: blur(8px) saturate(1.25);
+  border-top: 1px solid color-mix(in srgb, white 6%, transparent);
+  background-blend-mode: overlay;
+  position: relative;
+}
+
+.glass-node::before {
+  /* Subtle top inset highlight for a "lifted" look */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+}
+
+/* Pill-shaped edge label container — applied via foreignObject or rect+text in MapEdges.
+   Here we expose the styles as utility for any HTML rendering of edge labels. */
+.edge-label-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  user-select: none;
+}
+.edge-label-pill:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)) brightness(1.18);
+}
+
+/* Soft pulse keyframe for the active-tool-dot indicator */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Active tool dot — small dot indicator below the active tool icon.
+   Uses pulse-soft for a subtle "breathing" effect. */
+.active-tool-dot {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--primary);
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--primary) 60%, transparent);
+  animation: pulse-soft 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Status bar top accent gradient line — 1px tall gradient from transparent → primary → transparent.
+   (Used as a utility alternative to the inline gradient already present in StatusBar.tsx.) */
+.status-bar-accent-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 30%, transparent) 30%,
+    color-mix(in srgb, var(--primary) 30%, transparent) 70%,
+    transparent 100%
+  );
+}

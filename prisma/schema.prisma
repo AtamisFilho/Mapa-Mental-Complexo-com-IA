@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model MindMap {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  theme       String   @default("emerald")
+  tags        String?  // comma-separated
+  starred     Boolean  @default(false)
+  shareId     String?  @unique  // public read-only share token (cuid)
+  nodes       Node[]
+  edges       Edge[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Node {
+  id        String   @id @default(cuid())
+  mapId     String
+  map       MindMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  parentId  String?  // self-reference via edges instead; kept for root detection convenience
+  title     String
+  content   String?
+  note      String?
+  kind      String   @default("concept") // concept | question | action | idea | resource | goal
+  color     String?  // override color
+  icon      String?
+  image     String?  // generated image url (base64 or remote)
+  x         Float    @default(0)
+  y         Float    @default(0)
+  width     Float    @default(180)
+  height    Float    @default(72)
+  collapsed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Edge {
+  id        String   @id @default(cuid())
+  mapId     String
+  map       MindMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  sourceId  String
+  targetId  String
+  label     String?
+  kind      String   @default("related") // related | causes | supports | contradicts | depends
+  createdAt DateTime @default(now())
+}
