@@ -13,6 +13,8 @@ import {
   Check,
   LayoutTemplate,
   RefreshCw,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,6 +171,23 @@ export function Sidebar({ open, onClose }: Props) {
     setDeleteConfirmId(null);
     setDeleteConfirmTitle("");
   }, []);
+
+  // Duplicate (clone) a map via POST /api/maps/[id]/duplicate. Shows a
+  // spinner on the clicked card, then refreshes the list. The clone gets a
+  // "(cópia)" suffix automatically.
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const handleDuplicate = useCallback(async (id: string) => {
+    setDuplicatingId(id);
+    try {
+      const res = await fetch(`/api/maps/${id}/duplicate`, { method: "POST" });
+      if (res.ok) {
+        await fetchMaps();
+      }
+    } catch {
+      /* silent */
+    }
+    setDuplicatingId(null);
+  }, [fetchMaps]);
 
   const handleStartRename = useCallback((id: string, currentTitle: string) => {
     setRenamingId(id);
@@ -390,6 +409,22 @@ export function Sidebar({ open, onClose }: Props) {
                               title="Renomear"
                             >
                               <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-primary transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicate(m.id);
+                              }}
+                              title="Duplicar mapa"
+                            >
+                              {duplicatingId === m.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
                             </Button>
                             <Button
                               variant="ghost"

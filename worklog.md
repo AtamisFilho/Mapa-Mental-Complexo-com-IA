@@ -2734,3 +2734,57 @@ Recommended next steps (prioridade para a próxima rodada):
 6. **Sticky notes** — novo tipo de nó "note" (schema change).
 7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
 8. **Edge style customization** — estilo da aresta (solid, dashed, dotted, width).
+
+---
+Task ID: 22-webDevReview-cron
+Agent: webDevReview (cron job, round 22)
+Task: Continuar desenvolvimento — QA com agent-browser, adicionar features, melhorar estilo, atualizar worklog.
+
+Work Log:
+- Lido o worklog.md (2736 linhas) para entender o progresso: Rodadas 14-21 completaram 13+ bugs corrigidos, multi-select drag, zoom to selection (Z), quick-add kind menu, focus mode (M), node kind legend, map depth indicator, use-collab signature fast-path, 7 templates, node notes popover, map statistics dashboard, color quick-picker, search match navigation (Ctrl+G). Estado: lint limpo.
+
+## QA via agent-browser
+- Iniciado dev server (NODE_OPTIONS=--max-old-space-size=384, porta 3000).
+- Encontrado erro EAGAIN (resource limit) — sandbox sob pressão de processos. Limpei processos e reiniciei.
+- Criado mapa de teste via API com 2 nós e 1 aresta.
+- **API duplicate testado e funcional**: POST /api/maps/{id}/duplicate retornou clone "QA R22 (cópia)" com 2 nós e 1 aresta (arestas remapeadas corretamente para novos IDs).
+- **Lista de mapas confirmou 2 mapas**: original + clone, ambos com 2 nós.
+- agent-browser falhou (ERR_CONNECTION_REFUSED — server morreu durante browser open). Sandbox instável.
+
+## Nova funcionalidade
+
+### Map Duplicate (Clone) — API + Sidebar button
+- **Novo endpoint POST /api/maps/[id]/duplicate**: clona um mapa inteiro (title, description, theme, tags, todos os nós, todas as arestas) num novo mapa com sufixo "(cópia)".
+  - Nodes: novos IDs gerados, todos os dados preservados (title, kind, position, content, note, color, icon, image, collapsed). parentId remapeado via old-id → new-id map.
+  - Edges: sourceId/targetId remapeados para novos node IDs. Apenas arestas com ambos endpoints válidos são criadas (defensive).
+  - Non-destructive: o mapa original nunca é modificado.
+  - Usa `createMany` para nodes e edges (eficiente, 2 queries em vez de N).
+- **Sidebar**: botão "Duplicar mapa" (ícone Copy) aparece on hover entre Renomear e Excluir. Mostra Loader2 spinner durante a duplicação. Após sucesso, faz fetchMaps() para atualizar a lista.
+- **Testado via curl**: clone criado com 2 nós e 1 aresta corretamente remapeada. Lista confirma 2 mapas (original + "QA R22 (cópia)").
+- **Impacto**: utilizadores podem agora duplicar mapas para experimentar variações sem risco de corromper o original — útil para criar versões de brainstorm, experimentar layouts, ou backup rápido.
+
+## QA e verificação
+- **Lint**: `bun run lint` → 0 erros, 0 warnings ✓
+- **API**: POST /api/maps/{id}/duplicate testado — clone criado com nodes/edges corretos, arestas remapeadas, "(cópia)" sufixo aplicado ✓
+- **agent-browser**: ERR_CONNECTION_REFUSED após server morrer. Não completou QA visual.
+- **Inspeção estática**: duplicate endpoint segue o padrão do share endpoint (Params interface, db imports, NextResponse). Sidebar button segue o padrão do rename/delete (group-hover:opacity-100, Loader2 spinner).
+
+Stage Summary:
+- **1 nova funcionalidade**: Map Duplicate (clone completo via API + botão na Sidebar com spinner).
+- **API testada e funcional**: clone criado com nós/arestas remapeados corretamente.
+- **Lint limpo** (0/0).
+- **Worklog atualizado** com registo completo da Rodada 22.
+
+Unresolved issues / Risks:
+- Sandbox instável (EAGAIN + SIGTERM) impediu QA visual interativo. A API foi testada via curl e funciona.
+- Não foi feito git commit/push (acumulado das Rodadas 14-22).
+
+Recommended next steps (prioridade para a próxima rodada):
+1. **Git commit/push** das Rodadas 14-22 para o repositório GitHub.
+2. **QA visual completo** quando o sandbox estiver estável — testar botão Duplicar na Sidebar.
+3. **API route auth** — middleware de autenticação.
+4. **Collab-service auth/CORS**.
+5. **Persistir collab roster em Redis**.
+6. **Sticky notes** — novo tipo de nó "note" (schema change).
+7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
+8. **Edge style customization** — estilo da aresta (solid, dashed, dotted, width).
