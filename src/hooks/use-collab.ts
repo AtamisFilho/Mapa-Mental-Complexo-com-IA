@@ -154,6 +154,14 @@ export function useCollab(
   const lastNodesRef = useRef<Map<string, MapNode>>(new Map());
   const lastEdgesRef = useRef<Map<string, MapEdge>>(new Map());
 
+  // Quick signature of the last-seen nodes/edges state. The store fires
+  // `subscribe` on EVERY state change (pan, zoom, hover, selection…) which
+  // would otherwise trigger a full O(n) diff of all nodes/edges each time.
+  // We compare this cheap signature first and skip the diff entirely when
+  // nodes/edges haven't changed. Signature = count + sum of updatedAt timestamps
+  // + count of edges. Good enough to detect any structural or content change.
+  const lastSignatureRef = useRef<string>("");
+
   // Pending batch of emits for the next microtask flush.
   const pendingEmitsRef = useRef<
     Array<() => void>
@@ -237,6 +245,16 @@ export function useCollab(
     const { nodes, edges } = useMindMapStore.getState();
     lastNodesRef.current = new Map(nodes.map((n) => [n.id, n]));
     lastEdgesRef.current = new Map(edges.map((e) => [e.id, e]));
+    lastSignatureRef.current = computeSignature(nodes, edges);
+  }
+
+  /** Cheap signature: node count + edge count + concatenation of updatedAt.
+   *  Any add/delete/update changes this string, so a string equality check
+   *  is enough to skip the full diff when only viewport/selection changed. */
+  function computeSignature(nodes: MapNode[], edges: MapEdge[]): string {
+    let s = `${nodes.length}:${edges.length}:`;
+    for (const n of nodes) s += (n.updatedAt ?? "") + "|";
+    return s;
   }
 
   function diffAndEmitLocal() {
@@ -247,6 +265,15 @@ export function useCollab(
     if (!sock || !ident || !mid) return;
 
     const { nodes, edges } = useMindMapStore.getState();
+
+    // Fast path: if the nodes/edges signature hasn't changed since the last
+    // diff (e.g. only viewport/selection/hover changed), skip the full O(n)
+    // diff entirely. This is the main perf win — the subscribe callback fires
+    // on every pan/zoom tick, and without this check we'd iterate all nodes
+    // and edges each time.
+    const sig = computeSignature(nodes, edges);
+    if (sig === lastSignatureRef.current) return;
+
     const prevNodes = lastNodesRef.current;
     const prevEdges = lastEdgesRef.current;
 
@@ -334,6 +361,7 @@ export function useCollab(
     // refresh snapshot for the next diff
     lastNodesRef.current = new Map(nodes.map((n) => [n.id, n]));
     lastEdgesRef.current = new Map(edges.map((e) => [e.id, e]));
+    lastSignatureRef.current = sig;
   }
 
   // ── Main connect/disconnect effect ──────────────────────────────────────

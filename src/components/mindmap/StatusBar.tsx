@@ -29,6 +29,34 @@ export function StatusBar() {
     kindCounts[n.kind] = (kindCounts[n.kind] ?? 0) + 1;
   }
 
+  // Compute map depth (longest root→leaf chain) via BFS from roots.
+  // Useful stat: tells the user how deep their tree has grown.
+  let mapDepth = 0;
+  if (nodes.length > 0 && edges.length > 0) {
+    const childrenOf = new Map<string, string[]>();
+    const hasParent = new Set<string>();
+    for (const e of edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+      hasParent.add(e.targetId);
+    }
+    const roots = nodes.filter((n) => !hasParent.has(n.id)).map((n) => n.id);
+    const start = roots.length > 0 ? roots : [nodes[0].id];
+    const queue: Array<{ id: string; depth: number }> = start.map((id) => ({ id, depth: 1 }));
+    const visited = new Set<string>();
+    while (queue.length) {
+      const { id, depth } = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      if (depth > mapDepth) mapDepth = depth;
+      for (const child of childrenOf.get(id) ?? []) {
+        if (!visited.has(child)) queue.push({ id: child, depth: depth + 1 });
+      }
+    }
+  } else if (nodes.length > 0) {
+    mapDepth = 1;
+  }
+
   return (
     <div className="grid grid-cols-3 items-center px-4 py-2.5 border-t backdrop-blur-md text-xs gap-3 min-h-[40px] relative"
       style={{
@@ -54,6 +82,16 @@ export function StatusBar() {
           <span className="font-bold text-foreground leading-none">{edges.length}</span>
           <span className="leading-none">conexões</span>
         </span>
+        {mapDepth > 0 && (
+          <span
+            className="pill-badge shrink-0 hidden md:flex items-center justify-center"
+            style={{ borderLeftColor: "var(--primary)", borderLeftWidth: 3 }}
+            title="Profundidade máxima da árvore (nível mais profundo)"
+          >
+            <span className="font-bold text-foreground leading-none">{mapDepth}</span>
+            <span className="leading-none">níveis</span>
+          </span>
+        )}
         {selectedNodeIds.length > 0 && (
           <span className="pill-badge pill-badge--accent shrink-0 flex items-center justify-center">
             <Circle className="h-2.5 w-2.5 fill-primary text-primary" />

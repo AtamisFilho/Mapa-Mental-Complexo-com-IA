@@ -19,6 +19,7 @@ import {
   ChevronRight,
   FileText,
   MoreHorizontal,
+  Plus,
 } from "lucide-react";
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -62,6 +63,10 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
   const selectNode = useMindMapStore((s) => s.selectNode);
   const setHovered = useMindMapStore((s) => s.setHovered);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+  const addNode = useMindMapStore((s) => s.addNode);
+  const addEdge = useMindMapStore((s) => s.addEdge);
+  const pushHistory = useMindMapStore((s) => s.pushHistory);
+  const focusNode = useMindMapStore((s) => s.focusNode);
   const childCount = useMindMapStore((s) => s.edges.filter((e) => e.sourceId === node.id).length);
   const hasChildren = childCount > 0;
   // Check if any selected node is directly connected to this node (for chain highlight)
@@ -406,6 +411,39 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           title="Arraste para conectar"
         >
           <GripVertical className="h-3 w-3" />
+        </button>
+
+        {/* Quick-add child button — appears on hover at the bottom-center.
+            Clicking it creates a new child node (concept kind) positioned
+            below this node and immediately connects it. This is a big
+            productivity win: users no longer need to switch to the Add tool
+            or remember the C shortcut to build out a tree. */}
+        <button
+          aria-label="Adicionar filho"
+          onClick={(e) => {
+            e.stopPropagation();
+            pushHistory();
+            const childId = addNode({
+              title: "Novo conceito",
+              kind: "concept",
+              parentId: node.id,
+              x: node.x + 40,
+              y: node.y + node.height + 70,
+              width: node.width,
+              height: node.height,
+            });
+            if (childId) {
+              addEdge(node.id, childId);
+              selectNode(childId);
+              focusNode(childId);
+            }
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 hidden h-6 w-6 items-center justify-center rounded-full border-2 bg-background shadow-md transition-all duration-200 hover:scale-125 hover:border-primary hover:text-primary group-hover:flex"
+          style={{ borderColor: accentColor, color: accentColor }}
+          title="Adicionar filho (conceito)"
+        >
+          <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
     </motion.div>

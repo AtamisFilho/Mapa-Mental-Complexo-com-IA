@@ -12,6 +12,7 @@ import type { NodeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
 import { NodeContextMenu } from "./NodeContextMenu";
+import { NodeKindLegend } from "./NodeKindLegend";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1215,6 +1216,11 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Node kind legend — floating Info button (bottom-left) with a popover
+          showing the 6 node kinds, their colors, and the add-shortcut keys.
+          Hidden in read-only share mode (no editing hints for viewers). */}
+      {!readOnly && <NodeKindLegend />}
     </div>
   );
 }
