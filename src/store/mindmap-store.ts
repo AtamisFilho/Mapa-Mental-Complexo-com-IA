@@ -48,6 +48,12 @@ interface MindMapState {
   searchMatches: string[]; // nodeIds that match the current query
   highlightedMatchId: string | null;
 
+  // focus mode (Round 17) — when active, only the focused nodes (the selected
+  // node's ancestors + descendants + self) are at full opacity; all others
+  // are dimmed. Useful for concentrating on a subtree in large maps.
+  focusMode: boolean;
+  focusNodeIds: string[];
+
   // actions: data
   loadMap: (map: MindMapData) => void;
   setMeta: (title: string, description: string) => void;
@@ -103,6 +109,7 @@ interface MindMapState {
   setSearchQuery: (q: string) => void;
   setSearchMatches: (ids: string[]) => void;
   setHighlightedMatch: (id: string | null) => void;
+  toggleFocusMode: () => void;
   searchNodes: (
     query: string,
     opts?: { caseSensitive?: boolean; titleOnly?: boolean }
@@ -152,6 +159,10 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   searchQuery: "",
   searchMatches: [],
   highlightedMatchId: null,
+
+  // focus mode (Round 17)
+  focusMode: false,
+  focusNodeIds: [],
 
   loadMap: (map) =>
     set({
@@ -810,6 +821,58 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setSearchMatches: (ids) => set({ searchMatches: ids }),
   setHighlightedMatch: (id) => set({ highlightedMatchId: id }),
+
+  toggleFocusMode: () => {
+    const state = get();
+    // If focus mode is already on, turn it off.
+    if (state.focusMode) {
+      set({ focusMode: false, focusNodeIds: [] });
+      return;
+    }
+    // Otherwise, compute the focus set from the current selection.
+    // The focus set = the selected node + all its ancestors + all its descendants.
+    const selectedIds = state.selectedNodeIds;
+    if (selectedIds.length === 0) {
+      // No selection → can't focus. Leave focus off.
+      set({ focusMode: false, focusNodeIds: [] });
+      return;
+    }
+    const focusSet = new Set<string>();
+    // Build child map for descendant BFS
+    const childrenOf = new Map<string, string[]>();
+    for (const e of state.edges) {
+      if (!childrenOf.has(e.sourceId)) childrenOf.set(e.sourceId, []);
+      childrenOf.get(e.sourceId)!.push(e.targetId);
+    }
+    // Build parent map for ancestor walk
+    const parentOf = new Map<string, string>();
+    for (const e of state.edges) {
+      parentOf.set(e.targetId, e.sourceId);
+    }
+    // For each selected node, add ancestors + self + descendants.
+    for (const sid of selectedIds) {
+      // ancestors (walk up)
+      let cur: string | undefined = sid;
+      while (cur && !focusSet.has(cur)) {
+        focusSet.add(cur);
+        cur = parentOf.get(cur);
+      }
+      // descendants (BFS down)
+      const queue = [sid];
+      const visited = new Set<string>([sid]);
+      while (queue.length) {
+        const c = queue.shift()!;
+        focusSet.add(c);
+        for (const child of childrenOf.get(c) ?? []) {
+          if (!visited.has(child)) {
+            visited.add(child);
+            queue.push(child);
+          }
+        }
+      }
+    }
+    set({ focusMode: true, focusNodeIds: Array.from(focusSet) });
+  },
 
   searchNodes: (query, opts) => {
     const caseSensitive = opts?.caseSensitive ?? false;

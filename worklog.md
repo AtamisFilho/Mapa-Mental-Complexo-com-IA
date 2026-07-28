@@ -2431,3 +2431,68 @@ Recommended next steps (prioridade para a próxima rodada):
 6. **Quick-add menu** — o botão + poderia abrir um mini-menu para escolher o kind do filho.
 7. **Map templates gallery** — mais templates (SWOT, 5W2H expandido, OKR, etc.).
 8. **Export to Mermaid** — além de PNG/SVG/JSON/MD, exportar como mermaid graph.
+
+---
+Task ID: 17-webDevReview-cron
+Agent: webDevReview (cron job, round 17)
+Task: Continuar desenvolvimento — QA com agent-browser, corrigir bugs, melhorar estilo, adicionar features, atualizar worklog.
+
+Work Log:
+- Lido o worklog.md (2433 linhas) para entender o progresso: Rodadas 14-16 completaram 13+ bugs corrigidos, multi-select drag, zoom to selection (Z), quick-add child button, node kind legend, map depth indicator, use-collab signature fast-path. Estado: lint limpo.
+
+## QA via agent-browser
+- Tentativa de QA com agent-browser — sandbox instável (SIGTERM kills intermitentes matam o dev server entre comandos bash). O processo inicia ("Ready in 643ms") mas é terminado antes de conseguir servir requests. Não foi possível completar QA visual nesta rodada. O código foi verificado via lint (0 erros) e inspeção estática.
+
+## Novas funcionalidades
+
+### 1. Quick-Add Kind Menu (MapNode.tsx) — UPGRADE do quick-add button
+- O botão "+" de adicionar filho (introduzido na Rodada 16) agora abre um **mini-menu popover** com os 6 tipos de nó (Conceito, Pergunta, Ação, Ideia, Recurso, Objetivo) em vez de criar sempre um "concept".
+- Cada opção mostra o ícone colorido + label do kind. Click cria o filho do tipo escolhido, conecta, seleciona e foca.
+- O ícone Plus rotaciona 45° quando o menu está aberto (vira um "×" visual).
+- Menu fecha on outside-click, Escape, ou após seleção.
+- Animação framer-motion (fade + scale + slide-up), backdrop blur, gradient header "Tipo de nó".
+- **Antes**: o botão + sempre criava um "Novo conceito". **Agora**: o utilizador escolhe o kind visualmente.
+
+### 2. Focus Mode (mindmap-store.ts + MindMapCanvas.tsx + MapNode.tsx + MapEdges.tsx + Toolbar.tsx)
+- **Nova feature**: Modo Foco que escurece (dim para 25% opacity + saturate 0.5) todos os nós que NÃO estão no "foco" — o foco = o nó selecionado + todos os seus ancestrais + todos os seus descendentes.
+- Útil para mapas grandes: permite concentrar numa subárvore específica sem distrações visuais.
+- **Store**: adicionado `focusMode: boolean`, `focusNodeIds: string[]`, e action `toggleFocusMode()`. A action computa o focus set via BFS (descendants) + parent walk (ancestors) com visited set anti-ciclo.
+- **MapNode**: adicionado prop `isDimmed` — quando true, aplica `opacity: 0.25`, `filter: saturate(0.5)`, `transition: 0.3s ease`.
+- **MapEdges**: arestas onde qualquer endpoint não está no focus set ficam com `opacity: 0.15`. Transição suave de 0.3s.
+- **MindMapCanvas**: passa `isDimmed` a cada MapNodeView e `focusMode`/`focusNodeIds` ao MapEdges.
+- **Atalho `M`**: toggle do modo foco (sem Ctrl/Cmd, ignora inputs).
+- **Toolbar**: botão Focus (ícone Focus do lucide-react) com estado active destacado (toolbar-btn--active), disabled quando não há seleção e foco está off.
+- **Indicator banner**: quando foco ativo, mostra pill no topo "Modo foco ativo · N nós em foco" com botão ✕ para sair.
+- **ShortcutsPanel**: documentado `{ keys: "M", action: "Modo foco (escurece nós não relacionados)", category: "Visualização" }`.
+- **Empty state**: adicionado hint `M` Modo foco.
+
+## Melhorias de estilo
+- QuickAddMenu popover com design polido: gradient header, 2-column grid, hover scale nos ícones, transições smooth.
+- Focus mode indicator banner com backdrop blur e botão de close.
+- Edge dimming com transição suave de 0.3s (era 0.15s) para um efeito de "fade" mais elegante.
+- Node dimming com `saturate(0.5)` adicional à opacity — dá um efeito de "desbotado" mais natural que apenas opacity.
+
+## QA e verificação
+- **Lint**: `bun run lint` → 0 erros, 0 warnings ✓
+- **agent-browser QA**: não foi possível completar devido a SIGTERM kills intermitentes do sandbox. O processo next-server inicia mas é terminado antes de servir requests.
+- **Inspeção estática**: todos os componentes, props, e imports verificados manualmente. A lógica do toggleFocusMode (BFS + parent walk com visited set) está correta. O QuickAddMenu segue o padrão do NodeKindLegend (mesmo pattern de outside-click + Escape + framer-motion).
+
+Stage Summary:
+- **2 novas funcionalidades**: Quick-Add Kind Menu (upgrade do + button com kind picker) e Focus Mode (M — escurece nós/arestas não focados).
+- **Styling polish**: popover com gradient + grid, indicator banner com backdrop blur, transições suaves de 0.3s.
+- **Lint limpo** (0/0).
+- **Worklog atualizado** com registo completo da Rodada 17.
+
+Unresolved issues / Risks:
+- Sandbox SIGTERM kills impedem QA visual. O código está correto (lint + inspeção estática), mas não foi possível verificar visualmente o Focus Mode ou o QuickAddMenu aberto.
+- Não foi feito git commit/push (acumulado das Rodadas 14-17).
+
+Recommended next steps (prioridade para a próxima rodada):
+1. **Git commit/push** das Rodadas 14-17 para o repositório GitHub.
+2. **QA visual completo** quando o sandbox estiver estável — testar Focus Mode (selecionar nó, pressionar M, verificar que outros nós escurecem), QuickAddMenu (hover num nó, clicar +, verificar popover com 6 kinds).
+3. **API route auth** — middleware de autenticação.
+4. **Collab-service auth/CORS**.
+5. **Persistir collab roster em Redis**.
+6. **Sticky notes** — novo tipo de nó "note" (schema change).
+7. **Map templates gallery** — SWOT, OKR, etc.
+8. **Focus mode automático** — opcionalmente ativar foco ao selecionar um nó (setting toggle).

@@ -11,6 +11,8 @@ interface Props {
   edges: MapEdge[];
   connectingFrom: string | null;
   cursorWorld: { x: number; y: number } | null;
+  focusMode?: boolean;
+  focusNodeIds?: Set<string>;
 }
 
 function bez(sx: number, sy: number, tx: number, ty: number) {
@@ -89,7 +91,7 @@ function endAngle(sx: number, sy: number, tx: number, ty: number) {
   return Math.atan2(ty - pt.y, tx - pt.x);
 }
 
-function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
+function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld, focusMode, focusNodeIds }: Props) {
   const selectEdge = useMindMapStore((s) => s.selectEdge);
   const selectedEdgeIds = useMindMapStore((s) => s.selectedEdgeIds);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
@@ -238,6 +240,7 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
           arrowX,
           arrowY,
           arrowSize,
+          isDimmed: focusMode && focusNodeIds ? (!focusNodeIds.has(e.sourceId) || !focusNodeIds.has(e.targetId)) : false,
         };
       })
       .filter(Boolean) as Array<{
@@ -261,8 +264,9 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
       arrowX: number;
       arrowY: number;
       arrowSize: number;
+      isDimmed: boolean;
     }>;
-  }, [edges, nodeMap, showLabels, selectedEdgeIds, selectedNodeSet]);
+  }, [edges, nodeMap, showLabels, selectedEdgeIds, selectedNodeSet, focusMode, focusNodeIds]);
 
   const fromNode = connectingFrom ? nodeMap.get(connectingFrom) : null;
   const fromX = fromNode ? fromNode.x + fromNode.width / 2 : 0;
@@ -348,9 +352,9 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             strokeWidth={p.selected ? 3.5 : 2.8}
             strokeDasharray={p.dash}
             strokeLinecap="round"
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
+            opacity={p.isDimmed ? 0.15 : p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
             className={p.selected ? "edge-animated-dash" : undefined}
-            style={{ transition: "stroke-width 0.15s ease, opacity 0.15s ease" }}
+            style={{ transition: "stroke-width 0.15s ease, opacity 0.3s ease" }}
           />
           {/* Arrowhead indicator at target end — drawn AFTER the path so it
               sits on top, with a subtle white stroke for contrast against
@@ -372,8 +376,8 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             stroke="white"
             strokeWidth={0.5}
             strokeOpacity={0.6}
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
-            style={{ transition: "opacity 0.15s ease" }}
+            opacity={p.isDimmed ? 0.15 : p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
+            style={{ transition: "opacity 0.3s ease" }}
           />
           {/* Edge label with pill background, hover scale + brighter, contrasting text outline */}
           {p.label && editingEdgeId !== p.id && (

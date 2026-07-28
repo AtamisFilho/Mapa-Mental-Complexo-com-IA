@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Sparkles, Trash2 } from "lucide-react";
+import { Sparkles, Trash2, Focus } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
@@ -256,6 +256,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const redo = useMindMapStore((s) => s.redo);
   const fitToView = useMindMapStore((s) => s.fitToView);
   const fitSelection = useMindMapStore((s) => s.fitSelection);
+  const focusMode = useMindMapStore((s) => s.focusMode);
+  const focusNodeIds = useMindMapStore((s) => s.focusNodeIds);
+  const toggleFocusMode = useMindMapStore((s) => s.toggleFocusMode);
+  const focusNodeSet = useMemo(() => new Set(focusNodeIds), [focusNodeIds]);
 
   // Convert screen coords to world coords
   const screenToWorld = useCallback(
@@ -852,6 +856,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         return;
       }
       if (!shortcutsEnabled) return;
+      const k = e.key.toLowerCase();
       // Fit to view
       if (e.key === "f" || e.key === "F") {
         e.preventDefault();
@@ -867,11 +872,16 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           return;
         }
       }
+      // Focus mode (M) — dims non-focused nodes (ancestors + descendants of selection stay bright).
+      if (k === "m") {
+        e.preventDefault();
+        toggleFocusMode();
+        return;
+      }
       // Add node shortcuts: C/P/A/I/R/O
       const keyMap: Record<string, NodeKind> = {
         c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
       };
-      const k = e.key.toLowerCase();
       if (keyMap[k]) {
         e.preventDefault();
         const cx = window.innerWidth / 2;
@@ -924,7 +934,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
@@ -1013,6 +1023,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           edges={visibleEdges}
           connectingFrom={connectingFrom}
           cursorWorld={cursorWorld}
+          focusMode={focusMode}
+          focusNodeIds={focusNodeSet}
         />
         {/* Alignment / snap guides — rendered ABOVE edges but BELOW nodes
             (z-order in SVG/HTML is determined by document order, so this
@@ -1095,6 +1107,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               isHighlighted={highlightedNodeIds.has(node.id)}
               isReparentTarget={reparentTargetId === node.id}
               isBeingDraggedForReparent={draggedNodeId === node.id}
+              isDimmed={focusMode && !focusNodeSet.has(node.id)}
             />
           ))}
         </AnimatePresence>
@@ -1120,6 +1133,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">L</kbd> Conectar</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">Z</kbd> Zoom seleção</span>
+              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">M</kbd> Modo foco</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> Buscar</span>
             </div>
             <p className="text-[11px] text-muted-foreground/70 italic">
@@ -1134,6 +1148,22 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
             Clique em um nó para iniciar a conexão
+          </div>
+        </div>
+      )}
+      {/* Focus mode indicator — shows when focus mode is active */}
+      {!readOnly && focusMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto">
+          <div className="flex items-center gap-2 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in backdrop-blur-sm">
+            <Focus className="h-3 w-3" />
+            Modo foco ativo · {focusNodeIds.length} nós em foco
+            <button
+              onClick={() => toggleFocusMode()}
+              className="ml-1 hover:bg-primary-foreground/20 rounded px-1.5 py-0.5 transition-colors"
+              title="Sair do modo foco"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

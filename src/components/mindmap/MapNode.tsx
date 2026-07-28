@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { memo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { memo, useState, useEffect, useRef } from "react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
@@ -39,6 +39,7 @@ interface Props {
   isHighlighted?: boolean;
   isReparentTarget?: boolean; // Task 16-B: highlight when node is reparent drop target
   isBeingDraggedForReparent?: boolean; // Task 16-B: reduced opacity while being dragged for reparent
+  isDimmed?: boolean; // Round 17: focus mode dims non-focused nodes
 }
 
 /** Hook to track if a node was created within the last 3 seconds */
@@ -57,7 +58,7 @@ function useIsFresh(createdAt: string) {
   return isFresh;
 }
 
-function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted, isReparentTarget, isBeingDraggedForReparent }: Props) {
+function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted, isReparentTarget, isBeingDraggedForReparent, isDimmed }: Props) {
   const selected = useMindMapStore((s) => s.selectedNodeIds.includes(node.id));
   const hovered = useMindMapStore((s) => s.hoveredNodeId === node.id);
   const selectNode = useMindMapStore((s) => s.selectNode);
@@ -162,6 +163,10 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
         cursor: "grab",
         zIndex: selected ? 30 : hovered ? 20 : 10,
         touchAction: "none",
+        // Focus mode: dim non-focused nodes to 25% opacity.
+        opacity: isDimmed ? 0.25 : 1,
+        filter: isDimmed ? "saturate(0.5)" : "none",
+        transition: "opacity 0.3s ease, filter 0.3s ease",
       }}
       className={`select-none group micro-hover-scale ${
         isFresh ? "node-fresh-entrance" : ""
@@ -413,19 +418,19 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           <GripVertical className="h-3 w-3" />
         </button>
 
-        {/* Quick-add child button — appears on hover at the bottom-center.
-            Clicking it creates a new child node (concept kind) positioned
-            below this node and immediately connects it. This is a big
-            productivity win: users no longer need to switch to the Add tool
-            or remember the C shortcut to build out a tree. */}
-        <button
-          aria-label="Adicionar filho"
-          onClick={(e) => {
-            e.stopPropagation();
+        {/* Quick-add child menu — appears on hover at the bottom-center.
+            Clicking the + button opens a radial mini-menu where the user
+            picks the kind of child to add (Conceito, Pergunta, Ação, Ideia,
+            Recurso, Objetivo). The chosen kind is created below this node,
+            connected automatically, selected, and focused. */}
+        <QuickAddMenu
+          parentNode={node}
+          accentColor={accentColor}
+          onAdd={(kind) => {
             pushHistory();
             const childId = addNode({
-              title: "Novo conceito",
-              kind: "concept",
+              title: "Novo " + NODE_KIND_META[kind].label.toLowerCase(),
+              kind,
               parentId: node.id,
               x: node.x + 40,
               y: node.y + node.height + 70,
@@ -438,16 +443,114 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
               focusNode(childId);
             }
           }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 hidden h-6 w-6 items-center justify-center rounded-full border-2 bg-background shadow-md transition-all duration-200 hover:scale-125 hover:border-primary hover:text-primary group-hover:flex"
-          style={{ borderColor: accentColor, color: accentColor }}
-          title="Adicionar filho (conceito)"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        />
       </div>
     </motion.div>
   );
 }
 
 export const MapNodeView = memo(MapNodeComponent);
+
+// ── QuickAddMenu ────────────────────────────────────────────────────────────
+// A small popover that opens when the user clicks the + button on a node.
+// Shows 6 kind options in a 3×2 grid, each with the kind's icon and label.
+// Closes on outside-click, Escape, or after a selection.
+
+const QUICK_ADD_KINDS: NodeKind[] = ["concept", "question", "action", "idea", "resource", "goal"];
+
+function QuickAddMenu({
+  parentNode,
+  accentColor,
+  onAdd,
+}: {
+  parentNode: MapNodeType;
+  accentColor: string;
+  onAdd: (kind: NodeKind) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside-click or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-50">
+      {/* Trigger button */}
+      <button
+        aria-label="Adicionar filho"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`flex h-6 w-6 items-center justify-center rounded-full border-2 bg-background shadow-md transition-all duration-200 hover:scale-125 hover:border-primary hover:text-primary ${
+          open ? "scale-125 border-primary text-primary" : ""
+        }`}
+        style={{ borderColor: open ? undefined : accentColor, color: open ? undefined : accentColor }}
+        title="Adicionar filho"
+      >
+        <Plus className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-45" : ""}`} />
+      </button>
+
+      {/* Kind picker popover */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.9 }}
+            animate={{ opacity: 1, y: 8, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.9 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-44 rounded-lg border border-border bg-popover/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-2 py-1.5 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo de nó</span>
+            </div>
+            <div className="p-1 grid grid-cols-2 gap-0.5">
+              {QUICK_ADD_KINDS.map((kind) => {
+                const meta = NODE_KIND_META[kind];
+                const Icon = KIND_ICONS[kind] ?? Sparkles;
+                return (
+                  <button
+                    key={kind}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAdd(kind);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-accent/60 transition-colors text-left group"
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-transform group-hover:scale-110"
+                      style={{ background: `${meta.color}18`, color: meta.color }}
+                    >
+                      <Icon className="h-3 w-3" />
+                    </span>
+                    <span className="text-[11px] font-medium leading-none">{meta.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
