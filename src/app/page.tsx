@@ -99,6 +99,8 @@ export default function Home() {
 
   const minimapEnabled = useSettingsStore((s) => s.settings.visual.minimap);
   const collabEnabled = useSettingsStore((s) => s.settings.editor.collab);
+  const themeMode = useSettingsStore((s) => s.settings.theme.mode);
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
   // Real-time collaboration (presence + remote cursors). Only active when the
   // user has enabled it in Settings AND we have a real map loaded (not in
@@ -214,10 +216,16 @@ export default function Home() {
         e.preventDefault();
         setStatsOpen((v) => !v);
       }
+      // Ctrl+J → toggle theme (dark/light). Cycles: dark → light → system → dark.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        e.preventDefault();
+        const next = themeMode === "dark" ? "light" : themeMode === "light" ? "system" : "dark";
+        setThemeMode(next);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openSearch, readOnly]);
+  }, [openSearch, readOnly, themeMode, setThemeMode]);
 
   // Global Shift+L to toggle the LayoutPanel (visual organization) — disabled in read-only mode.
   useEffect(() => {

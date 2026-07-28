@@ -78,6 +78,7 @@ interface MindMapState {
   resetViewport: () => void;
   selectNode: (id: string, additive?: boolean) => void;
   selectEdge: (id: string) => void;
+  selectAll: () => void;
   clearSelection: () => void;
   setHovered: (id: string | null) => void;
   focusNode: (id: string) => void;
@@ -370,6 +371,14 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     set({ selectedEdgeIds: [id], selectedNodeIds: [] }),
 
   clearSelection: () => set({ selectedNodeIds: [], selectedEdgeIds: [] }),
+
+  // Select all nodes at once (Ctrl+A). Useful for bulk operations like
+  // multi-drag, bulk delete, or applying a layout to everything.
+  selectAll: () =>
+    set((s) => ({
+      selectedNodeIds: s.nodes.map((n) => n.id),
+      selectedEdgeIds: [],
+    })),
 
   setHovered: (id) => set({ hoveredNodeId: id }),
 

@@ -260,6 +260,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const focusNodeIds = useMindMapStore((s) => s.focusNodeIds);
   const toggleFocusMode = useMindMapStore((s) => s.toggleFocusMode);
   const cycleHighlight = useMindMapStore((s) => s.cycleHighlight);
+  const selectAll = useMindMapStore((s) => s.selectAll);
   const searchMatchesCount = useMindMapStore((s) => s.searchMatches.length);
   const focusNodeSet = useMemo(() => new Set(focusNodeIds), [focusNodeIds]);
 
@@ -784,6 +785,12 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         }
         return;
       }
+      // Select all nodes: Ctrl/Cmd+A
+      if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
       // Copy nodes: Ctrl/Cmd+C
       if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C")) {
         if (selectedNodeIds.length > 0) {
@@ -945,7 +952,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
+  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, selectAll, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges]);
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"

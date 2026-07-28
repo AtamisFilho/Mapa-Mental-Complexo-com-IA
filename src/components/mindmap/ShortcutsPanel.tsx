@@ -18,6 +18,8 @@ export function ShortcutsPanel({ open, onClose }: Props) {
     { keys: "Ctrl + Shift + S", action: "Estatísticas do mapa", category: "Geral" },
     { keys: "Ctrl + G", action: "Próximo resultado da busca", category: "Geral" },
     { keys: "Ctrl + Shift + G", action: "Resultado anterior da busca", category: "Geral" },
+    { keys: "Ctrl + J", action: "Alternar tema (escuro/claro/sistema)", category: "Geral" },
+    { keys: "Ctrl + A", action: "Selecionar todos os nós", category: "Edição" },
     { keys: "Ctrl + Z", action: "Desfazer", category: "Edição" },
     { keys: "Ctrl + Y", action: "Refazer", category: "Edição" },
     { keys: "Ctrl + Shift + Z", action: "Refazer (alternativo)", category: "Edição" },
