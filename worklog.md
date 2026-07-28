@@ -2553,3 +2553,69 @@ Recommended next steps (prioridade para a próxima rodada):
 6. **Sticky notes** — novo tipo de nó "note" (schema change).
 7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
 8. **Auto-focus mode** — setting toggle para ativar foco automaticamente ao selecionar.
+
+---
+Task ID: 19-webDevReview-cron
+Agent: webDevReview (cron job, round 19)
+Task: Continuar desenvolvimento — QA com agent-browser, adicionar features, melhorar estilo, atualizar worklog.
+
+Work Log:
+- Lido o worklog.md (2555 linhas) para entender o progresso: Rodadas 14-18 completaram 13+ bugs corrigidos, multi-select drag, zoom to selection (Z), quick-add kind menu, focus mode (M), node kind legend, map depth indicator, use-collab signature fast-path, 3 new templates (SWOT/OKR/Timeline), node notes popover. Estado: lint limpo.
+
+## QA via agent-browser
+- Iniciado dev server (NODE_OPTIONS=--max-old-space-size=384, porta 3000).
+- Criado mapa de teste via API com 2 nós (Solar, Painéis) e 1 aresta.
+- Página carregou (HTTP 200), título correto.
+- **Snapshot confirmou botão "Estatísticas do mapa" (e16)** presente no toolbar.
+- **Snapshot confirmou botão "Modo foco (M)" (e12)** presente.
+- **Snapshot confirmou nós renderizados**: "ConceitoSolarRen1 filhos", "RecursoPainéis".
+- VLM: qualidade visual 8/10 (design moderno, tema escuro, boa tipografia).
+- Tentativa de abrir StatsPanel — onboarding tour overlay bloqueou o clique inicial; após dismiss do tour, o dev server morreu (SIGTERM). Não foi possível verificar o painel aberto visualmente, mas o botão está presente e o componente foi verificado por inspeção estática.
+
+## Nova funcionalidade
+
+### Map Statistics Dashboard (StatsPanel.tsx — NEW component)
+- **Novo painel slide-out** (animação spring framer-motion) com analytics completos do mapa:
+  - **3 summary cards** no topo: Nós (primary), Arestas (roxo), Níveis (amber) — cada um com ícone, cor de accent, e border-top colorido.
+  - **Distribuição por tipo de nó**: gráfico de barras horizontais colorido (cada kind com a sua cor meta), com contagem dentro da barra, percentagem à direita. Apenas kinds presentes são mostrados. Largura da barra proporcional ao count/max.
+  - **Distribuição por tipo de conexão**: mesmo formato para os 5 EdgeKinds (related, causes, supports, contradicts, depends).
+  - **Adoção de recursos**: grid 2×3 de MiniStats mostrando quantos nós têm content/notas/imagens/ícones/recolhidos/folhas, cada um com barra de progresso.
+  - **Métricas da árvore**: nós raiz, nós folha, ramos médios por pai (avg), profundidade máxima.
+  - **Header**: título do mapa + timestamp do último save (com ícone Clock).
+- Design polido: gradient header (from-primary/15), backdrop blur, border-l, scrollable, transições de 500ms nas barras (ease-out).
+- Atalho **Ctrl+Shift+S** para toggle do painel (documentado no ShortcutsPanel).
+- Botão dedicado no Toolbar (ícone BarChart3 do lucide-react) com tooltip "Estatísticas do mapa".
+- Hidden em modo read-only.
+- Code-split via next/dynamic (ssr:false).
+
+## Melhorias de estilo
+- StatsPanel com visual profissional: cards com border-top colorido, barras com gradient (color/aa → color), font tabular-nums para alinhamento, uppercase tracking-wider para headers de secção.
+- MiniStat com barra de progresso animada (transition-all duration-500).
+- Animação spring (stiffness 300, damping 30) no slide-in do painel.
+
+## QA e verificação
+- **Lint**: `bun run lint` → 0 erros, 0 warnings ✓
+- **agent-browser QA**: botão "Estatísticas do mapa" confirmado presente no toolbar; nós renderizados corretamente; 0 erros de runtime.
+- **VLM**: qualidade visual 8/10.
+- **Inspeção estática**: StatsPanel segue o padrão do LayoutPanel/SettingsPanel (mesmo pattern de slide-out + framer-motion). Cálculos de depth/leaf/avgChildren verificados.
+
+Stage Summary:
+- **1 nova funcionalidade**: Map Statistics Dashboard (painel completo com contagens, gráficos de barras, adoção de recursos, métricas de árvore).
+- **1 novo atalho**: Ctrl+Shift+S para toggle das estatísticas.
+- **Styling polish**: cards coloridos, barras com gradient, animações spring, font tabular-nums.
+- **Lint limpo** (0/0), **QA via agent-browser confirmou botão presente**, **VLM 8/10**.
+- **Nova componente**: `src/components/mindmap/StatsPanel.tsx`.
+
+Unresolved issues / Risks:
+- Sandbox SIGTERM kills impediram verificação visual do StatsPanel aberto. O botão está presente (confirmado) e o componente foi verificado por inspeção estática.
+- Não foi feito git commit/push (acumulado das Rodadas 14-19).
+
+Recommended next steps (prioridade para a próxima rodada):
+1. **Git commit/push** das Rodadas 14-19 para o repositório GitHub.
+2. **QA visual completo** quando o sandbox estiver estável — abrir StatsPanel, verificar gráficos.
+3. **API route auth** — middleware de autenticação.
+4. **Collab-service auth/CORS**.
+5. **Persistir collab roster em Redis**.
+6. **Sticky notes** — novo tipo de nó "note" (schema change).
+7. **Drag-to-reorder siblings** — reordenar irmãos visualmente.
+8. **Auto-focus mode** — setting toggle para ativar foco automaticamente ao selecionar.

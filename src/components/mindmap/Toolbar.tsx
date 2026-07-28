@@ -25,6 +25,7 @@ import {
   Share2,
   ScanSearch,
   Focus,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMindMapStore } from "@/store/mindmap-store";
@@ -42,6 +43,7 @@ interface Props {
   onOpenSearch: () => void;
   onOpenNodeEditor: () => void;
   onOpenShare: () => void;
+  onOpenStats?: () => void;
   /** Optional: parent hook fired when the layout panel button is clicked
    *  (e.g. to close other right-side panels via mutual exclusion). When not
    *  provided, the Toolbar manages the LayoutPanel open-state internally. */
@@ -77,7 +79,7 @@ function ToolTipBadge({ shortcut }: { shortcut: string }) {
   );
 }
 
-export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor, onOpenShare, onOpenLayout }: Props) {
+export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenShortcuts, onOpenExport, onOpenSearch, onOpenNodeEditor, onOpenShare, onOpenStats, onOpenLayout }: Props) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const { tool, setTool } = useTool();
@@ -331,11 +333,16 @@ export function Toolbar({ onOpenSettings, onOpenAIPanel, onOpenSidebar, onOpenSh
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Group 5: Shortcuts, AI, Export, Settings */}
+      {/* Group 5: Shortcuts, Stats, AI, Export, Settings */}
       <span className="toolbar-group">
         {shortcutsEnabled && (
           <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenShortcuts} data-tooltip="Atalhos de teclado (?)">
             <Keyboard className="h-4 w-4" />
+          </Button>
+        )}
+        {onOpenStats && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors toolbar-btn" onClick={onOpenStats} data-tooltip="Estatísticas do mapa">
+            <BarChart3 className="h-4 w-4" />
           </Button>
         )}
         {aiEnabled && (

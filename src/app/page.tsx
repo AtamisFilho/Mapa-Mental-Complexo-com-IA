@@ -26,6 +26,7 @@ const NodeEditor = dynamic(() => import("@/components/mindmap/NodeEditor").then(
 const AIPanel = dynamic(() => import("@/components/mindmap/AIPanel").then(m => ({ default: m.AIPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const SettingsPanel = dynamic(() => import("@/components/mindmap/SettingsPanel").then(m => ({ default: m.SettingsPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const ShortcutsPanel = dynamic(() => import("@/components/mindmap/ShortcutsPanel").then(m => ({ default: m.ShortcutsPanel })), { ssr: false });
+const StatsPanel = dynamic(() => import("@/components/mindmap/StatsPanel").then(m => ({ default: m.StatsPanel })), { ssr: false });
 const ExportPanel = dynamic(() => import("@/components/mindmap/ExportPanel").then(m => ({ default: m.ExportPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const CommandPalette = dynamic(() => import("@/components/mindmap/CommandPalette").then(m => ({ default: m.CommandPalette })), { ssr: false });
 const OnboardingTour = dynamic(() => import("@/components/mindmap/OnboardingTour").then(m => ({ default: m.OnboardingTour })), { ssr: false });
@@ -66,6 +67,7 @@ export default function Home() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -207,6 +209,11 @@ export default function Home() {
         e.preventDefault();
         openSearch();
       }
+      // Ctrl+Shift+S → toggle stats panel
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        setStatsOpen((v) => !v);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -283,6 +290,7 @@ export default function Home() {
     setTemplatesOpen(false);
   }, []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
+  const handleOpenStats = useCallback(() => setStatsOpen(true), []);
   const handleOpenExport = useCallback(() => {
     setExportOpen(true);
     setNodeEditorOpen(false);
@@ -356,6 +364,7 @@ export default function Home() {
             onOpenSearch={openSearch}
             onOpenNodeEditor={handleOpenNodeEditor}
             onOpenShare={handleOpenShare}
+            onOpenStats={handleOpenStats}
             onOpenLayout={handleOpenLayout}
           />
         )}
@@ -411,6 +420,9 @@ export default function Home() {
 
         {/* Shortcuts overlay */}
         {!readOnly && <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />}
+
+        {/* Statistics panel — map analytics dashboard */}
+        {!readOnly && <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />}
 
         {/* Command palette (Ctrl+K) — hidden in read-only mode */}
         {!readOnly && (

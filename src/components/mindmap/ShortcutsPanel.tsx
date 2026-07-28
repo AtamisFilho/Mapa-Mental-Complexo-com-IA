@@ -15,6 +15,7 @@ export function ShortcutsPanel({ open, onClose }: Props) {
 
   const shortcuts = [
     { keys: "Ctrl + K", action: "Abrir busca / comandos", category: "Geral" },
+    { keys: "Ctrl + Shift + S", action: "Estatísticas do mapa", category: "Geral" },
     { keys: "Ctrl + Z", action: "Desfazer", category: "Edição" },
     { keys: "Ctrl + Y", action: "Refazer", category: "Edição" },
     { keys: "Ctrl + Shift + Z", action: "Refazer (alternativo)", category: "Edição" },
