@@ -53,10 +53,23 @@ server.log
 # Skills directory
 /skills/
 
+<<<<<<< HEAD
 # Internal artifacts (not for the repo)
+=======
+# Internal tool artifacts (not source code)
+>>>>>>> origin/main
 /tool-results/
 /agent-ctx/
 /download/
 /.zscripts/
+<<<<<<< HEAD
 /db/*.db
 /db/*.db-journal
+=======
+
+# SQLite database files (never commit — user data)
+/db/*.db
+/db/*.db-journal
+/db/*.db-wal
+/db/*.db-shm
+>>>>>>> origin/main

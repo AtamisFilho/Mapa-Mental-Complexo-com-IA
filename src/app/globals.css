@@ -239,6 +239,7 @@
   box-shadow: 0 0 0 2px var(--primary), 0 0 24px 4px var(--ring);
 }
 
+<<<<<<< HEAD
 /* Fresh node entrance — subtle scale + fade-in for newly created nodes.
    Applied via the `node-fresh-entrance` class (toggled by the useIsFresh hook). */
 .node-fresh-entrance {
@@ -259,6 +260,8 @@
   }
 }
 
+=======
+>>>>>>> origin/main
 /* Node title — subtle text-shadow for crispness against busy canvas backgrounds
    and improved contrast in both light and dark modes. */
 .node-title-text {
@@ -372,6 +375,7 @@
   box-shadow: 0 0 0 1.5px oklch(0.7 0.15 160 / 0.45), 0 0 16px 2px oklch(0.7 0.15 160 / 0.25);
 }
 
+<<<<<<< HEAD
 /* Micro hover scale (1.02x) with smooth transition + subtle lift.
    Applied to nodes — gives a tactile "pop" on hover without being
    distracting. Combines scale + translateY for a refined lift effect. */
@@ -387,6 +391,15 @@
 .micro-hover-scale:active {
   transform: scale(0.99);
   transition-duration: 0.08s;
+=======
+/* Micro hover scale (1.02x) with smooth transition */
+.micro-hover-scale {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.micro-hover-scale:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+>>>>>>> origin/main
 }
 
 /* Animated dash pattern for selected/highlighted edges */
@@ -416,6 +429,7 @@
   border-color: color-mix(in srgb, var(--border) 80%, transparent);
 }
 
+<<<<<<< HEAD
 /* ── Toolbar responsive behaviour ──────────────────────────────────────
    The toolbar holds many groups (brand, tools, add, undo/redo, zoom,
    search, actions, layout, IA, share, settings). On narrow viewports we
@@ -453,6 +467,8 @@
   }
 }
 
+=======
+>>>>>>> origin/main
 /* Toolbar button — subtle hover state for inactive icons */
 .toolbar-btn:hover:not(:disabled):not(.toolbar-btn--active) {
   background: color-mix(in srgb, var(--accent) 60%, transparent);
@@ -466,6 +482,7 @@
   box-shadow: inset 0 -2px 0 0 var(--primary), 0 0 8px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
+<<<<<<< HEAD
 /* ── Tooltips (data-tooltip attribute) ──────────────────────────────────
    Many toolbar / status-bar / footer buttons carry a `data-tooltip`
    attribute but there was no CSS to render it, so hover hints were
@@ -513,6 +530,8 @@
   transform: translateX(-50%) translateY(0);
 }
 
+=======
+>>>>>>> origin/main
 /* ── New utility classes (Task 5-a) ────────────────── */
 
 /* Glass panel — backdrop-blur with semi-transparent background and subtle border */

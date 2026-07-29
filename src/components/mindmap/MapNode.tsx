@@ -1,7 +1,12 @@
 "use client";
 
+<<<<<<< HEAD
 import { motion, AnimatePresence } from "framer-motion";
 import { memo, useState, useEffect, useRef, useCallback } from "react";
+=======
+import { motion } from "framer-motion";
+import { memo, useState, useEffect } from "react";
+>>>>>>> origin/main
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
@@ -19,11 +24,14 @@ import {
   ChevronRight,
   FileText,
   MoreHorizontal,
+<<<<<<< HEAD
   Plus,
   StickyNote,
   X,
   Palette,
   Check,
+=======
+>>>>>>> origin/main
 } from "lucide-react";
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -43,7 +51,10 @@ interface Props {
   isHighlighted?: boolean;
   isReparentTarget?: boolean; // Task 16-B: highlight when node is reparent drop target
   isBeingDraggedForReparent?: boolean; // Task 16-B: reduced opacity while being dragged for reparent
+<<<<<<< HEAD
   isDimmed?: boolean; // Round 17: focus mode dims non-focused nodes
+=======
+>>>>>>> origin/main
 }
 
 /** Hook to track if a node was created within the last 3 seconds */
@@ -62,16 +73,23 @@ function useIsFresh(createdAt: string) {
   return isFresh;
 }
 
+<<<<<<< HEAD
 function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted, isReparentTarget, isBeingDraggedForReparent, isDimmed }: Props) {
+=======
+function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu, isHighlighted, isReparentTarget, isBeingDraggedForReparent }: Props) {
+>>>>>>> origin/main
   const selected = useMindMapStore((s) => s.selectedNodeIds.includes(node.id));
   const hovered = useMindMapStore((s) => s.hoveredNodeId === node.id);
   const selectNode = useMindMapStore((s) => s.selectNode);
   const setHovered = useMindMapStore((s) => s.setHovered);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
+<<<<<<< HEAD
   const addNode = useMindMapStore((s) => s.addNode);
   const addEdge = useMindMapStore((s) => s.addEdge);
   const pushHistory = useMindMapStore((s) => s.pushHistory);
   const focusNode = useMindMapStore((s) => s.focusNode);
+=======
+>>>>>>> origin/main
   const childCount = useMindMapStore((s) => s.edges.filter((e) => e.sourceId === node.id).length);
   const hasChildren = childCount > 0;
   // Check if any selected node is directly connected to this node (for chain highlight)
@@ -167,10 +185,13 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
         cursor: "grab",
         zIndex: selected ? 30 : hovered ? 20 : 10,
         touchAction: "none",
+<<<<<<< HEAD
         // Focus mode: dim non-focused nodes to 25% opacity.
         opacity: isDimmed ? 0.25 : 1,
         filter: isDimmed ? "saturate(0.5)" : "none",
         transition: "opacity 0.3s ease, filter 0.3s ease",
+=======
+>>>>>>> origin/main
       }}
       className={`select-none group micro-hover-scale ${
         isFresh ? "node-fresh-entrance" : ""
@@ -404,6 +425,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           </span>
         )}
 
+<<<<<<< HEAD
         {/* Note badge — small sticky-note icon at top-right when the node has
             a note. Clicking it opens a popover to view/edit the note inline,
             without needing to open the full NodeEditor. */}
@@ -418,6 +440,8 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
           <ColorQuickPicker nodeId={node.id} currentColor={node.color} accentColor={accentColor} />
         )}
 
+=======
+>>>>>>> origin/main
         {/* #10: Connect handle — larger (h-6 w-6), smooth transition, ring animation when connect tool active */}
         <button
           aria-label="Conectar a partir deste nó"
@@ -435,6 +459,7 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
         >
           <GripVertical className="h-3 w-3" />
         </button>
+<<<<<<< HEAD
 
         {/* Quick-add child menu — appears on hover at the bottom-center.
             Clicking the + button opens a radial mini-menu where the user
@@ -462,12 +487,15 @@ function MapNodeComponent({ node, onPointerDown, onConnectHandle, onContextMenu,
             }
           }}
         />
+=======
+>>>>>>> origin/main
       </div>
     </motion.div>
   );
 }
 
 export const MapNodeView = memo(MapNodeComponent);
+<<<<<<< HEAD
 
 // ── QuickAddMenu ────────────────────────────────────────────────────────────
 // A small popover that opens when the user clicks the + button on a node.
@@ -841,3 +869,5 @@ function ColorQuickPicker({
     </div>
   );
 }
+=======
+>>>>>>> origin/main

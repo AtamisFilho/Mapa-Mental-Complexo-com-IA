@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Mapa Mental Complexo com IA
 
 Aplicação web para criação de **mapas mentais complexos** com assistência de **Inteligência Artificial**. Construída com Next.js 16, TypeScript, Prisma e shadcn/ui.
@@ -199,3 +200,6 @@ Esta rodada realizou uma **auditoria de código completa** que identificou **13 
 ## 📄 Licença
 
 Projeto de uso livre.
+=======
+# Mapa-Mental-Complexo-com-IA
+>>>>>>> origin/main
