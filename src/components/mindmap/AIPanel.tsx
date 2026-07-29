@@ -50,10 +50,7 @@ export function AIPanel({ open, onClose }: Props) {
   const mergeEdges = useMindMapStore((s) => s.mergeEdges);
   const focusNode = useMindMapStore((s) => s.focusNode);
   const updateNode = useMindMapStore((s) => s.updateNode);
-<<<<<<< HEAD
   const pushHistory = useMindMapStore((s) => s.pushHistory);
-=======
->>>>>>> origin/main
   const mapTitle = useMindMapStore((s) => s.title);
 
   const settings = useSettingsStore((s) => s.settings);
@@ -79,11 +76,8 @@ export function AIPanel({ open, onClose }: Props) {
       });
       const data = await res.json();
       if (data.nodes) {
-<<<<<<< HEAD
         // Snapshot once so the whole expand operation is a single undo step.
         pushHistory();
-=======
->>>>>>> origin/main
         const children = data.nodes.map((n: { title: string; kind: string; content?: string }, i: number) => {
           const angle = (i / data.nodes.length) * Math.PI * 2 - Math.PI / 2;
           const radius = 280;
@@ -112,11 +106,7 @@ export function AIPanel({ open, onClose }: Props) {
       setResult("Erro de conexão com a IA.");
     }
     loadingAction(null);
-<<<<<<< HEAD
   }, [selectedNode, nodes, mapTitle, thinking, addNode, addEdge, pushHistory]);
-=======
-  }, [selectedNode, nodes, mapTitle, thinking, addNode, addEdge]);
->>>>>>> origin/main
 
   // Generate full map from topic
   const handleGenerate = useCallback(async () => {
@@ -131,11 +121,8 @@ export function AIPanel({ open, onClose }: Props) {
       });
       const data = await res.json();
       if (data.nodes && data.edges) {
-<<<<<<< HEAD
         // Snapshot once so the whole generate operation is a single undo step.
         pushHistory();
-=======
->>>>>>> origin/main
         // Load into current map (merge)
         const typedNodes = data.nodes.map((n: Record<string, unknown>) => ({
           ...n,
@@ -163,11 +150,7 @@ export function AIPanel({ open, onClose }: Props) {
       setResult("Erro de conexão com a IA.");
     }
     loadingAction(null);
-<<<<<<< HEAD
   }, [topic, thinking, mergeNodes, addEdge, pushHistory]);
-=======
-  }, [topic, thinking, mergeNodes, addEdge]);
->>>>>>> origin/main
 
   // Summarize subtree
   const handleSummarize = useCallback(async () => {
@@ -175,13 +158,9 @@ export function AIPanel({ open, onClose }: Props) {
     loadingAction("summarize");
     setResult(null);
     try {
-<<<<<<< HEAD
       // Get subtree nodes (descendants only — do NOT traverse edges in
       // reverse, otherwise we'd include ancestors/siblings and summarize the
       // wrong portion of the map).
-=======
-      // Get subtree nodes
->>>>>>> origin/main
       const subtreeIds = new Set<string>();
       const queue = [selectedNode.id];
       while (queue.length) {
@@ -190,10 +169,6 @@ export function AIPanel({ open, onClose }: Props) {
         subtreeIds.add(cur);
         for (const e of edges) {
           if (e.sourceId === cur) queue.push(e.targetId);
-<<<<<<< HEAD
-=======
-          if (e.targetId === cur) queue.push(e.sourceId);
->>>>>>> origin/main
         }
       }
       const subtree = nodes.filter((n) => subtreeIds.has(n.id));
@@ -324,11 +299,8 @@ export function AIPanel({ open, onClose }: Props) {
       });
       const data = await res.json();
       if (data.positions) {
-<<<<<<< HEAD
         // Snapshot once so the whole re-layout is a single undo step.
         pushHistory();
-=======
->>>>>>> origin/main
         for (const n of nodes) {
           const pos = data.positions[n.id];
           if (pos) {
@@ -343,11 +315,7 @@ export function AIPanel({ open, onClose }: Props) {
       setResult("Erro de conexão.");
     }
     loadingAction(null);
-<<<<<<< HEAD
   }, [nodes, edges, updateNode, pushHistory]);
-=======
-  }, [nodes, edges, updateNode]);
->>>>>>> origin/main
 
   if (!open) return null;
 

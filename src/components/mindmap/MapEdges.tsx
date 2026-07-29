@@ -11,11 +11,8 @@ interface Props {
   edges: MapEdge[];
   connectingFrom: string | null;
   cursorWorld: { x: number; y: number } | null;
-<<<<<<< HEAD
   focusMode?: boolean;
   focusNodeIds?: Set<string>;
-=======
->>>>>>> origin/main
 }
 
 function bez(sx: number, sy: number, tx: number, ty: number) {
@@ -24,7 +21,6 @@ function bez(sx: number, sy: number, tx: number, ty: number) {
   return `M ${sx} ${sy} C ${mid} ${sy}, ${mid} ${ty}, ${tx} ${ty}`;
 }
 
-<<<<<<< HEAD
 /**
  * Compute the intersection point of a line from (sx,sy) to (tx,ty) with the
  * border of a rectangle centered at (tx,ty) with the given half-width /
@@ -73,8 +69,6 @@ function sourceBorderPoint(
   return { x: sx + dx * s, y: sy + dy * s };
 }
 
-=======
->>>>>>> origin/main
 // Compute tangent angle at the end of the bezier curve (for arrowhead direction)
 // For cubic bezier M sx,sy C mid,sy mid,ty tx,ty:
 // The tangent at t=1 is the direction from the last control point (mid, ty) to the endpoint (tx, ty)
@@ -97,11 +91,7 @@ function endAngle(sx: number, sy: number, tx: number, ty: number) {
   return Math.atan2(ty - pt.y, tx - pt.x);
 }
 
-<<<<<<< HEAD
 function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld, focusMode, focusNodeIds }: Props) {
-=======
-function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
->>>>>>> origin/main
   const selectEdge = useMindMapStore((s) => s.selectEdge);
   const selectedEdgeIds = useMindMapStore((s) => s.selectedEdgeIds);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
@@ -202,7 +192,6 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
         const s = nodeMap.get(e.sourceId);
         const t = nodeMap.get(e.targetId);
         if (!s || !t) return null;
-<<<<<<< HEAD
         const sHalfW = s.width / 2;
         const sHalfH = (s.height ?? 72) / 2;
         const tHalfW = t.width / 2;
@@ -220,25 +209,14 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
         const sy = src.y;
         const tx = dst.x;
         const ty = dst.y;
-=======
-        const sx = s.x + s.width / 2;
-        const sy = s.y + (s.height ?? 72) / 2;
-        const tx = t.x + t.width / 2;
-        const ty = t.y + (t.height ?? 72) / 2;
->>>>>>> origin/main
         const meta = EDGE_KIND_META[e.kind as keyof typeof EDGE_KIND_META] ?? EDGE_KIND_META.related;
         const isSelected = selectedEdgeIds.includes(e.id);
         // Edge is "connected to selected node" if either source or target is selected
         const isNodeConnected = selectedNodeSet.has(e.sourceId) || selectedNodeSet.has(e.targetId);
         const angle = endAngle(sx, sy, tx, ty);
-<<<<<<< HEAD
         // Arrowhead position: at the trimmed target border point.
         // Size bumped from 7 → 9 for better visibility at lower zoom levels.
         const arrowSize = 9;
-=======
-        // Arrowhead position: slightly before the target center
-        const arrowSize = 6;
->>>>>>> origin/main
         const arrowX = tx;
         const arrowY = ty;
         return {
@@ -262,10 +240,7 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
           arrowX,
           arrowY,
           arrowSize,
-<<<<<<< HEAD
           isDimmed: focusMode && focusNodeIds ? (!focusNodeIds.has(e.sourceId) || !focusNodeIds.has(e.targetId)) : false,
-=======
->>>>>>> origin/main
         };
       })
       .filter(Boolean) as Array<{
@@ -289,14 +264,9 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
       arrowX: number;
       arrowY: number;
       arrowSize: number;
-<<<<<<< HEAD
       isDimmed: boolean;
     }>;
   }, [edges, nodeMap, showLabels, selectedEdgeIds, selectedNodeSet, focusMode, focusNodeIds]);
-=======
-    }>;
-  }, [edges, nodeMap, showLabels, selectedEdgeIds, selectedNodeSet]);
->>>>>>> origin/main
 
   const fromNode = connectingFrom ? nodeMap.get(connectingFrom) : null;
   const fromX = fromNode ? fromNode.x + fromNode.width / 2 : 0;
@@ -382,7 +352,6 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
             strokeWidth={p.selected ? 3.5 : 2.8}
             strokeDasharray={p.dash}
             strokeLinecap="round"
-<<<<<<< HEAD
             opacity={p.isDimmed ? 0.15 : p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
             className={p.selected ? "edge-animated-dash" : undefined}
             style={{ transition: "stroke-width 0.15s ease, opacity 0.3s ease" }}
@@ -390,13 +359,6 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
           {/* Arrowhead indicator at target end — drawn AFTER the path so it
               sits on top, with a subtle white stroke for contrast against
               any background. */}
-=======
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
-            className={p.selected ? "edge-animated-dash" : undefined}
-            style={{ transition: "stroke-width 0.15s ease, opacity 0.15s ease" }}
-          />
-          {/* Arrowhead indicator at target end */}
->>>>>>> origin/main
           <polygon
             points={(() => {
               const s = p.arrowSize;
@@ -411,16 +373,11 @@ function EdgesComponent({ nodes, edges, connectingFrom, cursorWorld }: Props) {
               return `${tipX},${tipY} ${p1x},${p1y} ${p2x},${p2y}`;
             })()}
             fill={p.color}
-<<<<<<< HEAD
             stroke="white"
             strokeWidth={0.5}
             strokeOpacity={0.6}
             opacity={p.isDimmed ? 0.15 : p.selected ? 1 : p.isNodeConnected ? 0.95 : 0.85}
             style={{ transition: "opacity 0.3s ease" }}
-=======
-            opacity={p.selected ? 1 : p.isNodeConnected ? 0.9 : 0.75}
-            style={{ transition: "opacity 0.15s ease" }}
->>>>>>> origin/main
           />
           {/* Edge label with pill background, hover scale + brighter, contrasting text outline */}
           {p.label && editingEdgeId !== p.id && (

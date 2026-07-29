@@ -96,7 +96,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   await db.mindMap.delete({ where: { id } }).catch(() => {});
   return NextResponse.json({ ok: true });
 }
-<<<<<<< HEAD
 
 // PATCH — metadata-only update (title, description, theme, tags, starred).
 // This avoids the destructive PUT flow which deletes & recreates every node
@@ -127,5 +126,3 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
   return NextResponse.json({ map: updated });
 }
-=======
->>>>>>> origin/main

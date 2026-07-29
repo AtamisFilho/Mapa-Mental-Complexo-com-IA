@@ -2,17 +2,12 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-<<<<<<< HEAD
 import { Sparkles, Trash2, Focus } from "lucide-react";
-=======
-import { Sparkles } from "lucide-react";
->>>>>>> origin/main
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useTool } from "@/hooks/use-tool-context";
 import { useToastNotify } from "@/hooks/use-toast-notify";
 import { NODE_KIND_META } from "@/lib/settings";
-<<<<<<< HEAD
 import type { NodeKind, EdgeKind } from "@/lib/types";
 import { MapNodeView } from "./MapNode";
 import { MapEdges } from "./MapEdges";
@@ -28,12 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-=======
-import type { NodeKind } from "@/lib/types";
-import { MapNodeView } from "./MapNode";
-import { MapEdges } from "./MapEdges";
-import { NodeContextMenu } from "./NodeContextMenu";
->>>>>>> origin/main
 
 interface ContextMenuState {
   nodeId: string;
@@ -202,19 +191,15 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     nodeStartY: number;
     vpStartX: number;
     vpStartY: number;
-<<<<<<< HEAD
     // Multi-select drag: records the starting position of every selected
     // node so they all move together when the dragged node moves. The
     // dragged node itself is also included here (its entry is the source
     // of truth for the snap calculations).
     groupStart?: Array<{ id: string; x: number; y: number }>;
-=======
->>>>>>> origin/main
   } | null>(null);
 
   const { toast } = useToastNotify();
 
-<<<<<<< HEAD
   // Delete-confirmation dialog state. When the user has the
   // "confirmDelete" setting enabled, pressing Delete / Backspace (or the
   // toolbar delete button) opens this dialog instead of silently doing
@@ -226,8 +211,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   // IDs at an offset position.
   const clipboardRef = useRef<Array<{ title: string; kind: NodeKind; content: string | null | undefined; note: string | null | undefined; color: string | null | undefined; icon: string | null | undefined; image: string | null | undefined; width: number; height: number; }>>([]);
 
-=======
->>>>>>> origin/main
   const { tool, connectingFrom, cursorWorld, setConnectingFrom, setCursorWorld, setTool } = useTool();
 
   // Context menu state
@@ -249,12 +232,9 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const duplicateNode = useMindMapStore((s) => s.duplicateNode);
   const selectNodes = useMindMapStore((s) => s.selectNode);
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
-<<<<<<< HEAD
   const selectedEdgeIds = useMindMapStore((s) => s.selectedEdgeIds);
   const updateEdge = useMindMapStore((s) => s.updateEdge);
   const pushHistoryForEdge = useMindMapStore((s) => s.pushHistory);
-=======
->>>>>>> origin/main
   // Reparent (Task 16-B)
   const reparentTargetId = useMindMapStore((s) => s.reparentTargetId);
   const draggedNodeId = useMindMapStore((s) => s.draggedNodeId);
@@ -278,7 +258,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const undo = useMindMapStore((s) => s.undo);
   const redo = useMindMapStore((s) => s.redo);
   const fitToView = useMindMapStore((s) => s.fitToView);
-<<<<<<< HEAD
   const fitSelection = useMindMapStore((s) => s.fitSelection);
   const focusMode = useMindMapStore((s) => s.focusMode);
   const focusNodeIds = useMindMapStore((s) => s.focusNodeIds);
@@ -287,8 +266,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
   const selectAll = useMindMapStore((s) => s.selectAll);
   const searchMatchesCount = useMindMapStore((s) => s.searchMatches.length);
   const focusNodeSet = useMemo(() => new Set(focusNodeIds), [focusNodeIds]);
-=======
->>>>>>> origin/main
 
   // Convert screen coords to world coords
   const screenToWorld = useCallback(
@@ -409,17 +386,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
 
   const handleContextDuplicate = useCallback(
     (nodeId: string) => {
-<<<<<<< HEAD
       // duplicateNode already pushes history internally (undoable as one step).
       duplicateNode(nodeId);
     },
     [duplicateNode]
-=======
-      pushHistory();
-      duplicateNode(nodeId);
-    },
-    [pushHistory, duplicateNode]
->>>>>>> origin/main
   );
 
   const handleContextToggleCollapse = useCallback(
@@ -466,7 +436,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     [pushHistory, deleteNode]
   );
 
-<<<<<<< HEAD
   // Perform a batch delete of the given node ids as a single undoable step.
   // Used by the keyboard Delete/Backspace handler, the toolbar button, and
   // the confirm-delete dialog.
@@ -485,8 +454,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     [pushHistory, deleteNode, toast]
   );
 
-=======
->>>>>>> origin/main
   // Node pointer down — start drag or connect
   const handleNodePointerDown = useCallback(
     (e: React.PointerEvent, id: string) => {
@@ -507,7 +474,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
       if (!node) return;
       pushHistory();
       setDraggedNode(id); // Task 16-B: mark node as being dragged
-<<<<<<< HEAD
       // Multi-select drag: if the pointer-down node is part of the current
       // selection (and there is more than one selected node), capture the
       // starting positions of ALL selected nodes so they move as a group.
@@ -519,8 +485,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               .filter((n) => selectedNodeIds.includes(n.id))
               .map((n) => ({ id: n.id, x: n.x, y: n.y }))
           : undefined;
-=======
->>>>>>> origin/main
       dragRef.current = {
         type: "node",
         nodeId: id,
@@ -530,19 +494,12 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         nodeStartY: node.y,
         vpStartX: 0,
         vpStartY: 0,
-<<<<<<< HEAD
         groupStart,
-=======
->>>>>>> origin/main
       };
       setIsDragging(true);
       setDragType("node");
     },
-<<<<<<< HEAD
     [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode, readOnly, selectedNodeIds]
-=======
-    [tool, connectingFrom, nodes, addEdge, pushHistory, setConnectingFrom, setCursorWorld, setDraggedNode, readOnly]
->>>>>>> origin/main
   );
 
   // Connect handle pointer down
@@ -652,7 +609,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           setActiveGuides([]);
         }
 
-<<<<<<< HEAD
         // Apply the new position to the primary dragged node.
         updateNode(d.nodeId, { x: newX, y: newY });
 
@@ -672,10 +628,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           }
         }
 
-=======
-        updateNode(d.nodeId, { x: newX, y: newY });
-
->>>>>>> origin/main
         // ── Reparent detection (Task 16-B) ────────────────────────────────
         // Check if the dragged node's center overlaps with another node's
         // bounding box. If so, that node becomes the reparent target.
@@ -831,7 +783,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
       if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
         if (selectedNodeIds.length > 0) {
           e.preventDefault();
-<<<<<<< HEAD
           // duplicateNode pushes history internally (single undoable step).
           duplicateNode(selectedNodeIds[0]);
         }
@@ -883,11 +834,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           if (newIds.length > 0) {
             selectNodes(newIds[0]);
           }
-=======
-          pushHistory();
-          // Duplicate the first selected node
-          duplicateNode(selectedNodeIds[0]);
->>>>>>> origin/main
         }
         return;
       }
@@ -904,7 +850,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-<<<<<<< HEAD
         if (selectedNodeIds.length > 0) {
           // Backspace can trigger browser history-back; prevent it.
           e.preventDefault();
@@ -913,11 +858,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
             setConfirmDeleteIds([...selectedNodeIds]);
           } else {
             performDelete([...selectedNodeIds]);
-=======
-        if (selectedNodeIds.length > 0 && !confirmDelete) {
-          for (const id of selectedNodeIds) {
-            deleteNode(id);
->>>>>>> origin/main
           }
         }
         return;
@@ -928,7 +868,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         return;
       }
       if (!shortcutsEnabled) return;
-<<<<<<< HEAD
       const k = e.key.toLowerCase();
       // Cycle search matches: Ctrl+G (next), Ctrl+Shift+G (previous).
       // Only fires when there are active search matches.
@@ -939,15 +878,12 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         }
         return;
       }
-=======
->>>>>>> origin/main
       // Fit to view
       if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         fitToView(80);
         return;
       }
-<<<<<<< HEAD
       // Zoom to selection (Z) — fits the viewport to the currently selected
       // node(s). If nothing is selected, falls back to fitToView.
       if (e.key === "z" || e.key === "Z") {
@@ -979,16 +915,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         }
         return;
       }
-=======
->>>>>>> origin/main
       // Add node shortcuts: C/P/A/I/R/O
       const keyMap: Record<string, NodeKind> = {
         c: "concept", p: "question", a: "action", i: "idea", r: "resource", o: "goal",
       };
-<<<<<<< HEAD
-=======
-      const k = e.key.toLowerCase();
->>>>>>> origin/main
       if (keyMap[k]) {
         e.preventDefault();
         const cx = window.innerWidth / 2;
@@ -1006,7 +936,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         }
         return;
       }
-<<<<<<< HEAD
       // L — toggle the Connect tool (the toolbar tooltip advertises "(L)"
       // but there was no handler, so the hint was misleading).
       if (k === "l") {
@@ -1043,12 +972,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [undoRedo, undo, redo, selectedNodeIds, selectedEdgeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, fitSelection, toggleFocusMode, cycleHighlight, selectAll, searchMatchesCount, viewport, addNode, onOpenNodeEditor, readOnly, performDelete, nodes, selectNodes, focusNode, tool, setTool, edges, updateEdge, pushHistoryForEdge]);
-=======
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [undoRedo, undo, redo, selectedNodeIds, confirmDelete, deleteNode, duplicateNode, pushHistory, clearSelection, setConnectingFrom, shortcutsEnabled, fitToView, viewport, addNode, onOpenNodeEditor, readOnly]);
->>>>>>> origin/main
 
   const canvasBackground = useSettingsStore((s) => s.settings.visual.canvasBackground);
   const bgClass = canvasBackground === "grid" ? "canvas-grid-bg"
@@ -1137,11 +1060,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           edges={visibleEdges}
           connectingFrom={connectingFrom}
           cursorWorld={cursorWorld}
-<<<<<<< HEAD
           focusMode={focusMode}
           focusNodeIds={focusNodeSet}
-=======
->>>>>>> origin/main
         />
         {/* Alignment / snap guides — rendered ABOVE edges but BELOW nodes
             (z-order in SVG/HTML is determined by document order, so this
@@ -1224,10 +1144,7 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               isHighlighted={highlightedNodeIds.has(node.id)}
               isReparentTarget={reparentTargetId === node.id}
               isBeingDraggedForReparent={draggedNodeId === node.id}
-<<<<<<< HEAD
               isDimmed={focusMode && !focusNodeSet.has(node.id)}
-=======
->>>>>>> origin/main
             />
           ))}
         </AnimatePresence>
@@ -1250,14 +1167,10 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">P</kbd> Pergunta</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">A</kbd> Ação</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">I</kbd> Ideia</span>
-<<<<<<< HEAD
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">L</kbd> Conectar</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">Z</kbd> Zoom seleção</span>
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">M</kbd> Modo foco</span>
-=======
-              <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">F</kbd> Ajustar</span>
->>>>>>> origin/main
               <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> Buscar</span>
             </div>
             <p className="text-[11px] text-muted-foreground/70 italic">
@@ -1275,7 +1188,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           </div>
         </div>
       )}
-<<<<<<< HEAD
       {/* Focus mode indicator — shows when focus mode is active */}
       {!readOnly && focusMode && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto">
@@ -1302,8 +1214,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           </div>
         </div>
       )}
-=======
->>>>>>> origin/main
       {!readOnly && connectingFrom && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
           <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-medium shadow-lg fade-in">
@@ -1349,7 +1259,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         onIconChange={handleContextIconChange}
         onDelete={handleContextDelete}
       />
-<<<<<<< HEAD
 
       {/* Delete-confirmation dialog (only shown when confirmDelete is on) */}
       <AlertDialog
@@ -1389,8 +1298,6 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
           showing the 6 node kinds, their colors, and the add-shortcut keys.
           Hidden in read-only share mode (no editing hints for viewers). */}
       {!readOnly && <NodeKindLegend />}
-=======
->>>>>>> origin/main
     </div>
   );
 }

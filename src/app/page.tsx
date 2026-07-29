@@ -26,10 +26,7 @@ const NodeEditor = dynamic(() => import("@/components/mindmap/NodeEditor").then(
 const AIPanel = dynamic(() => import("@/components/mindmap/AIPanel").then(m => ({ default: m.AIPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const SettingsPanel = dynamic(() => import("@/components/mindmap/SettingsPanel").then(m => ({ default: m.SettingsPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const ShortcutsPanel = dynamic(() => import("@/components/mindmap/ShortcutsPanel").then(m => ({ default: m.ShortcutsPanel })), { ssr: false });
-<<<<<<< HEAD
 const StatsPanel = dynamic(() => import("@/components/mindmap/StatsPanel").then(m => ({ default: m.StatsPanel })), { ssr: false });
-=======
->>>>>>> origin/main
 const ExportPanel = dynamic(() => import("@/components/mindmap/ExportPanel").then(m => ({ default: m.ExportPanel })), { ssr: false, loading: () => <PanelSkeleton /> });
 const CommandPalette = dynamic(() => import("@/components/mindmap/CommandPalette").then(m => ({ default: m.CommandPalette })), { ssr: false });
 const OnboardingTour = dynamic(() => import("@/components/mindmap/OnboardingTour").then(m => ({ default: m.OnboardingTour })), { ssr: false });
@@ -70,10 +67,7 @@ export default function Home() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-<<<<<<< HEAD
   const [statsOpen, setStatsOpen] = useState(false);
-=======
->>>>>>> origin/main
   const [exportOpen, setExportOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -100,7 +94,6 @@ export default function Home() {
   const nodes = useMindMapStore((s) => s.nodes);
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
   const fitToView = useMindMapStore((s) => s.fitToView);
-<<<<<<< HEAD
   const focusNode = useMindMapStore((s) => s.focusNode);
   const selectNode = useMindMapStore((s) => s.selectNode);
 
@@ -108,11 +101,6 @@ export default function Home() {
   const collabEnabled = useSettingsStore((s) => s.settings.editor.collab);
   const themeMode = useSettingsStore((s) => s.settings.theme.mode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
-=======
-
-  const minimapEnabled = useSettingsStore((s) => s.settings.visual.minimap);
-  const collabEnabled = useSettingsStore((s) => s.settings.editor.collab);
->>>>>>> origin/main
 
   // Real-time collaboration (presence + remote cursors). Only active when the
   // user has enabled it in Settings AND we have a real map loaded (not in
@@ -170,7 +158,6 @@ export default function Home() {
           const mapData = await mapRes.json();
           loadMap(mapData.map);
         }
-<<<<<<< HEAD
 
         // ── Deep-link to a specific node (`?node=NODEID`) ──
         // After the map loads, if the URL contains a ?node= param (produced
@@ -187,19 +174,13 @@ export default function Home() {
             }, 120);
           }
         }
-=======
->>>>>>> origin/main
       } catch (e) {
         console.error("Failed to initialize map:", e);
       }
       setLoadingMap(false);
     }
     init();
-<<<<<<< HEAD
   }, [loadMap, selectNode, focusNode]);
-=======
-  }, [loadMap]);
->>>>>>> origin/main
 
   // After the map loads, fit it to view (after a short delay to let layout settle)
   useEffect(() => {
@@ -230,7 +211,6 @@ export default function Home() {
         e.preventDefault();
         openSearch();
       }
-<<<<<<< HEAD
       // Ctrl+Shift+S → toggle stats panel
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
@@ -253,12 +233,6 @@ export default function Home() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [openSearch, readOnly, themeMode, setThemeMode]);
-=======
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [openSearch, readOnly]);
->>>>>>> origin/main
 
   // Global Shift+L to toggle the LayoutPanel (visual organization) — disabled in read-only mode.
   useEffect(() => {
@@ -331,10 +305,7 @@ export default function Home() {
     setTemplatesOpen(false);
   }, []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
-<<<<<<< HEAD
   const handleOpenStats = useCallback(() => setStatsOpen(true), []);
-=======
->>>>>>> origin/main
   const handleOpenExport = useCallback(() => {
     setExportOpen(true);
     setNodeEditorOpen(false);
@@ -405,16 +376,10 @@ export default function Home() {
             onOpenSidebar={handleOpenSidebar}
             onOpenShortcuts={handleOpenShortcuts}
             onOpenExport={handleOpenExport}
-<<<<<<< HEAD
             onOpenSearch={openSearch}
             onOpenNodeEditor={handleOpenNodeEditor}
             onOpenShare={handleOpenShare}
             onOpenStats={handleOpenStats}
-=======
-            onOpenSearch={() => setCommandPaletteOpen(true)}
-            onOpenNodeEditor={handleOpenNodeEditor}
-            onOpenShare={handleOpenShare}
->>>>>>> origin/main
             onOpenLayout={handleOpenLayout}
           />
         )}
@@ -471,12 +436,9 @@ export default function Home() {
         {/* Shortcuts overlay */}
         {!readOnly && <ShortcutsPanel open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />}
 
-<<<<<<< HEAD
         {/* Statistics panel — map analytics dashboard */}
         {!readOnly && <StatsPanel open={statsOpen} onClose={() => setStatsOpen(false)} />}
 
-=======
->>>>>>> origin/main
         {/* Command palette (Ctrl+K) — hidden in read-only mode */}
         {!readOnly && (
           <CommandPalette

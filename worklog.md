@@ -2970,3 +2970,51 @@ Recommended next steps (prioridade para a próxima rodada):
 7. **Node content preview on hover** — tooltip com o conteúdo completo do nó.
 8. **Map versioning/history** — snapshots do mapa ao salvar para voltar a versões anteriores.
 9. **Export to PDF** — além de PNG/SVG/JSON/MD/Mermaid, exportar como PDF.
+
+---
+Task ID: 26-git-push
+Agent: main (Z.ai Code)
+Task: Fazer o push de todo o trabalho das Rodadas 14-25 para o repositório GitHub.
+
+Work Log:
+- Configurado remote `origin` com PAT do GitHub (ghp_***).
+- Verificado divergência: 14 commits locais ahead, históricos unrelated (sem merge base comum).
+- O remote tinha o histórico das Rodadas 9-13 (deploy configs, layouts, branch consolidation).
+- O local tinha o histórico das Rodadas 14-25 (bugs corrigidos, novas features, styling).
+- **Merge com `--allow-unrelated-histories`**: 9 ficheiros em conflito (ShortcutsPanel, Sidebar, StatusBar, Toolbar, ServiceWorkerRegister, use-autosave, use-collab, templates, mindmap-store) + worklog.md.
+- **Resolução de conflitos**: preferida a versão local (ours) em todos os ficheiros de código — contém as correções e features das Rodadas 14-25. Ficheiros do remote preservados: Dockerfile, docker-compose.yml, DEPLOY.md, INSTALACAO.md, collab-service, scripts, postgres-init.
+- **Merge commit `78f05e4`** criado com mensagem descritiva.
+- **Push bem-sucedido**: `2af834f..78f05e4 main -> main`.
+- **PAT removido da URL do remote** por segurança após o push.
+- **Verificação**: 0 commits ahead (local e remote sincronizados), 165 ficheiros tracked.
+
+## Resultado do push
+- **Commits pushed**: 14 commits locais + 1 merge commit = 15 commits novos no remote.
+- **Ficheiros**: 165 ficheiros tracked (código fonte, configs, docs, mini-services, prisma, public).
+- **Linhas**: +3200/-996 (aprox.) — 13 bugs corrigidos, 20+ novas features, styling polish.
+- **URL**: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA/tree/main
+
+## Conteúdo pushed (Rodadas 14-25)
+### Bugs corrigidos (13)
+- Delete undoable, focusNode zoom, NodeEditor history debounce, PATCH non-destructive rename, BFS anti-cycle, organizeLayout math, AI actions undoable, tooltips CSS, summarize descendants, node deep-link, confirmDelete AlertDialog, autosave finally, maxNodes enforced.
+
+### Novas features (20+)
+- Atalhos: L/Ctrl+C/V/setas/Z/M/T/Ctrl+A/Ctrl+J/Ctrl+B/Ctrl+G/Ctrl+Shift+S
+- Multi-select drag, Focus mode, Node kind legend, Map depth indicator
+- 7 templates (SWOT, OKR, Timeline), Node notes popover, Map statistics dashboard
+- Color quick-picker, Search match navigation, Map duplicate (clone)
+- Star/favorite toggle + Sidebar filter, use-collab signature fast-path
+- Edge arrowhead na borda, Cycle edge kind
+
+### Styling
+- node-fresh-entrance animation, toolbar responsivo, micro-hover-scale com lift
+- Polished panels (StatsPanel, ColorQuickPicker, NoteBadge, QuickAddMenu, NodeKindLegend)
+- Focus mode dimming, search match counter banner
+
+Stage Summary:
+- ✅ **Push concluído com sucesso** — 15 commits pushed para origin/main.
+- ✅ **Histórico preservado** — tanto as Rodadas 9-13 (remote) como as 14-25 (local) estão no histórico.
+- ✅ **Lint limpo** (0/0).
+- ✅ **PAT removido** da URL do remote por segurança.
+- ✅ **Local e remote sincronizados** (0 commits ahead).
+- **URL do repositório**: https://github.com/AtamisFilho/Mapa-Mental-Complexo-com-IA

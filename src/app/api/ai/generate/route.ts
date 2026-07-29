@@ -133,13 +133,10 @@ function layoutRadial(
 
   const ringRadius = [0, 260, 460, 620, 760];
   const queue: GenNode[] = [root];
-<<<<<<< HEAD
   // Track visited nodes to prevent an infinite loop when the AI returns a
   // cyclic parent relationship (e.g. A→B→A via parentId). Without this guard
   // the BFS would re-enqueue forever and hang the request.
   const visited = new Set<string>([root.id]);
-=======
->>>>>>> origin/main
   while (queue.length) {
     const cur = queue.shift()!;
     const depth = positions.get(cur.id)!.depth;
@@ -151,12 +148,9 @@ function layoutRadial(
     const arc = kids.length > 1 ? Math.PI * 0.9 : Math.PI * 0.4;
     const startAngle = Math.atan2(parentPos.y, parentPos.x) - arc / 2;
     kids.forEach((kid, i) => {
-<<<<<<< HEAD
       // Skip kids we've already positioned (cycle / diamond guard).
       if (visited.has(kid.id)) return;
       visited.add(kid.id);
-=======
->>>>>>> origin/main
       const t = kids.length === 1 ? 0 : i / (kids.length - 1);
       const angle = startAngle + arc * t;
       const px = Math.cos(angle) * radius;

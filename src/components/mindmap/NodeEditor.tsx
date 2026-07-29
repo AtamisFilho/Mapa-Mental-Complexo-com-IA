@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
 import { useCallback, useRef, useEffect } from "react";
-=======
-import { useCallback } from "react";
->>>>>>> origin/main
 import {
   X,
   Trash2,
@@ -95,10 +91,7 @@ export function NodeEditor({ open, onClose }: Props) {
   const edges = useMindMapStore((s) => s.edges);
   const updateNode = useMindMapStore((s) => s.updateNode);
   const deleteNode = useMindMapStore((s) => s.deleteNode);
-<<<<<<< HEAD
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
-=======
->>>>>>> origin/main
   const pushHistory = useMindMapStore((s) => s.pushHistory);
   const mapId = useMindMapStore((s) => s.mapId);
 
@@ -109,7 +102,6 @@ export function NodeEditor({ open, onClose }: Props) {
 
   const node = nodes.find((n) => n.id === selectedNodeIds[0]);
 
-<<<<<<< HEAD
   // Coalesce rapid keystrokes into a single undo entry. Previously every
   // keystroke pushed a new history entry, so typing a 10-char title created
   // 10 undo steps. We now push at most once per EDIT_DEBOUNCE_MS of
@@ -126,8 +118,6 @@ export function NodeEditor({ open, onClose }: Props) {
     }
   }, [node]);
 
-=======
->>>>>>> origin/main
   // Find edges connected to this node
   const connectedEdges = node
     ? edges.filter((e) => e.sourceId === node.id || e.targetId === node.id)
@@ -140,15 +130,11 @@ export function NodeEditor({ open, onClose }: Props) {
   const handleChange = useCallback(
     (field: string, value: string | boolean) => {
       if (!node) return;
-<<<<<<< HEAD
       const now = Date.now();
       if (now - lastHistoryPushRef.current > EDIT_DEBOUNCE_MS) {
         pushHistory();
         lastHistoryPushRef.current = now;
       }
-=======
-      pushHistory();
->>>>>>> origin/main
       updateNode(node.id, { [field]: value });
     },
     [node, pushHistory, updateNode]
@@ -183,18 +169,11 @@ export function NodeEditor({ open, onClose }: Props) {
     if (confirmDelete) {
       if (!window.confirm("Excluir este nó e suas conexões?")) return;
     }
-<<<<<<< HEAD
     pushHistory();
     deleteNode(node.id);
     toast({ title: "Nó excluído", description: `"${node.title}" foi removido do mapa.`, variant: "error" });
     onClose();
   }, [node, confirmDelete, deleteNode, onClose, toast, pushHistory]);
-=======
-    deleteNode(node.id);
-    toast({ title: "Nó excluído", description: `"${node.title}" foi removido do mapa.`, variant: "error" });
-    onClose();
-  }, [node, confirmDelete, deleteNode, onClose, toast]);
->>>>>>> origin/main
 
   const handleGenerateImage = useCallback(async () => {
     if (!node || !aiImageEnabled) return;
@@ -220,7 +199,6 @@ export function NodeEditor({ open, onClose }: Props) {
 
   const handleToggleCollapsed = useCallback(() => {
     if (!node) return;
-<<<<<<< HEAD
     // toggleCollapse pushes history internally (undoable).
     toggleCollapse(node.id);
   }, [node, toggleCollapse]);
@@ -235,16 +213,6 @@ export function NodeEditor({ open, onClose }: Props) {
     const link = `${window.location.origin}/?${params.toString()}`;
     navigator.clipboard.writeText(link).then(() => {
       toast({ title: "Link do nó copiado", description: "Cole em outra aba para abrir este nó.", variant: "success" });
-=======
-    updateNode(node.id, { collapsed: !node.collapsed });
-  }, [node, updateNode]);
-
-  const handleShare = useCallback(() => {
-    if (!node || !mapId) return;
-    const link = `${window.location.origin}/map/${mapId}/node/${node.id}`;
-    navigator.clipboard.writeText(link).then(() => {
-      toast({ title: "Link copiado", description: "Link do nó copiado para a área de transferência.", variant: "success" });
->>>>>>> origin/main
     }).catch(() => {
       toast({ title: "Link gerado", description: link, variant: "default" });
     });
