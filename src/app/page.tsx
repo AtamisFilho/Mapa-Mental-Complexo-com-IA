@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { MindMapCanvas } from "@/components/mindmap/MindMapCanvas";
 import { Toolbar } from "@/components/mindmap/Toolbar";
@@ -16,6 +16,7 @@ import { ToolProvider, useTool } from "@/hooks/use-tool-context";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { BrainCircuit, Loader2, Search, LayoutTemplate, Eye, LogOut } from "lucide-react";
+import type { LayoutType } from "@/lib/layout-algorithms";
 
 // ── Code-splitting: heavy panels are lazy-loaded with ssr:false to keep the
 //    initial bundle lean and reduce dev-server memory pressure (OOM relief).
@@ -95,6 +96,7 @@ export default function Home() {
   const selectedNodeIds = useMindMapStore((s) => s.selectedNodeIds);
   const fitToView = useMindMapStore((s) => s.fitToView);
   const focusNode = useMindMapStore((s) => s.focusNode);
+  const applyLayout = useMindMapStore((s) => s.applyLayout);
   const selectNode = useMindMapStore((s) => s.selectNode);
 
   const minimapEnabled = useSettingsStore((s) => s.settings.visual.minimap);
@@ -182,13 +184,30 @@ export default function Home() {
     init();
   }, [loadMap, selectNode, focusNode]);
 
-  // After the map loads, fit it to view (after a short delay to let layout settle)
+  // After the map loads, apply the default layout (tree-right = árvore à direita)
+  // and fit it to view. The layout is only applied on the FIRST load of a map
+  // (when localStorage doesn't have a saved layout preference yet). If the user
+  // has previously chosen a layout, we respect that preference.
+  // This guarantees the map always opens with the tree-right layout by default,
+  // unless the user has explicitly chosen a different layout.
+  const lastLayoutApplied = useRef<string | null>(null);
   useEffect(() => {
-    if (!loadingMap && nodes.length > 0) {
-      const t = setTimeout(() => fitToView(80), 80);
+    if (!loadingMap && nodes.length > 0 && mapId && lastLayoutApplied.current !== mapId) {
+      lastLayoutApplied.current = mapId;
+      // Check if user has a saved layout preference; if not, apply tree-right.
+      const savedLayout = typeof window !== "undefined"
+        ? window.localStorage.getItem("mindmap:lastLayout")
+        : null;
+      const layoutToApply = (savedLayout as LayoutType) || "tree-right";
+      // Apply the layout after a short delay so the store has settled.
+      const t = setTimeout(() => {
+        applyLayout(layoutToApply);
+        // Fit to view after the layout is applied.
+        setTimeout(() => fitToView(80), 100);
+      }, 120);
       return () => clearTimeout(t);
     }
-  }, [loadingMap, nodes.length, fitToView]);
+  }, [loadingMap, nodes.length, mapId, applyLayout, fitToView]);
 
   // Global Ctrl+K to toggle command palette — disabled in read-only mode.
   useEffect(() => {

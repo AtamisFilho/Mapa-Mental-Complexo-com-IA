@@ -13,6 +13,8 @@ import {
   Palette,
   RotateCcw,
   Smile,
+  PlusCircle,
+  Globe,
 } from "lucide-react";
 import { useMindMapStore } from "@/store/mindmap-store";
 import { useSettingsStore } from "@/store/settings-store";
@@ -36,6 +38,11 @@ interface Props {
   onColorChange: (nodeId: string, color: string | null) => void;
   onIconChange: (nodeId: string, icon: string | null) => void;
   onDelete: (nodeId: string) => void;
+  /** Create a simple child node (just the title/content from the parent). */
+  onAddChild?: (nodeId: string) => void;
+  /** Create a child node enriched with web-sourced content based on the
+   *  parent's topic. Calls the AI expand endpoint for research. */
+  onAddChildWeb?: (nodeId: string) => void;
 }
 
 const COLOR_PRESETS = [
@@ -72,6 +79,8 @@ export function NodeContextMenu({
   onColorChange,
   onIconChange,
   onDelete,
+  onAddChild,
+  onAddChildWeb,
 }: Props) {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [showColors, setShowColors] = useState(false);
@@ -85,9 +94,45 @@ export function NodeContextMenu({
     ? nodes.find((n) => n.id === menuState.nodeId)
     : null;
 
-  // Build menu items
+  // Build menu items — "Criar sub-nó" options are at the TOP of the menu
+  // for easy access (most common action when right-clicking a node).
   const menuItems: MenuItem[] = node
     ? [
+        // ── Criar sub-nó (simple) ──
+        ...(onAddChild
+          ? [
+              {
+                id: "add-child" as string,
+                label: "Criar sub-nó" as string,
+                icon: <PlusCircle className="h-4 w-4" /> as React.ReactNode,
+                shortcut: "+" as string,
+                destructive: false as boolean | undefined,
+                disabled: false as boolean | undefined,
+                action: () => { onAddChild(node.id); onClose(); },
+              } as MenuItem,
+            ]
+          : []),
+        // ── Criar sub-nó com extensão web (AI-powered) ──
+        ...(onAddChildWeb && aiEnabled
+          ? [
+              {
+                id: "add-child-web" as string,
+                label: "Criar sub-nó com pesquisa web" as string,
+                icon: <Globe className="h-4 w-4" /> as React.ReactNode,
+                shortcut: "W" as string,
+                destructive: false as boolean | undefined,
+                disabled: false as boolean | undefined,
+                action: () => { onAddChildWeb(node.id); onClose(); },
+              } as MenuItem,
+            ]
+          : []),
+        // separator
+        {
+          id: "separator-add",
+          label: "",
+          icon: null,
+          action: () => {},
+        },
         {
           id: "edit",
           label: "Editar",

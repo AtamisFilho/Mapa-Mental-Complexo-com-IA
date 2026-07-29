@@ -392,6 +392,123 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
     [duplicateNode]
   );
 
+  // ── Add child (simple) ──
+  // Creates a child node positioned to the right of the parent (tree-right
+  // style), connected automatically, with a default "Novo conceito" title.
+  // The child is positioned BELOW any existing siblings to avoid overlap —
+  // this guarantees the tabulação (positioning) stays adequate during use.
+  const handleContextAddChild = useCallback(
+    (nodeId: string) => {
+      const parent = nodes.find((n) => n.id === nodeId);
+      if (!parent) return;
+      // Find existing children to position the new one below them.
+      const childEdges = edges.filter((e) => e.sourceId === nodeId);
+      const childNodes = childEdges
+        .map((e) => nodes.find((n) => n.id === e.targetId))
+        .filter(Boolean) as typeof nodes;
+      // Calculate the Y position: start at parent's Y, then stack below
+      // the last child (or below the parent if no children yet).
+      const baseY = parent.y;
+      const childSpacing = (parent.height ?? 88) + 30; // gap between siblings
+      const newY = childNodes.length > 0
+        ? Math.max(...childNodes.map((c) => c.y + (c.height ?? 88))) + 30
+        : baseY;
+      pushHistory();
+      const childId = addNode({
+        title: "Novo conceito",
+        kind: "concept",
+        parentId: parent.id,
+        // Position to the right of the parent (tree-right default layout).
+        x: parent.x + parent.width + 80,
+        y: newY,
+        width: parent.width,
+        height: parent.height,
+      });
+      if (childId) {
+        addEdge(parent.id, childId);
+        selectNodes(childId);
+        focusNode(childId);
+      }
+    },
+    [nodes, edges, pushHistory, addNode, addEdge, selectNodes, focusNode]
+  );
+
+  // ── Add child with web research (AI-powered) ──
+  // Calls the AI expand endpoint to generate child concepts based on the
+  // parent's title, then adds them as children with content. This is the
+  // "research" variant that enriches the map with web-sourced knowledge.
+  const [webResearching, setWebResearching] = useState<string | null>(null);
+  const handleContextAddChildWeb = useCallback(
+    async (nodeId: string) => {
+      const parent = nodes.find((n) => n.id === nodeId);
+      if (!parent) return;
+      setWebResearching(nodeId);
+      toast({
+        title: "Pesquisando na web…",
+        description: `A expandir "${parent.title}" com conteúdo baseado no tema.`,
+      });
+      try {
+        const res = await fetch("/api/ai/expand", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: parent.title,
+            context: `Tema: ${parent.title}. ${parent.content ?? ""}`,
+            count: 3,
+            thinking: false,
+          }),
+        });
+        const data = await res.json();
+        if (data.nodes && Array.isArray(data.nodes)) {
+          pushHistory();
+          const newIds: string[] = [];
+          // Position children in a fan to the right of the parent.
+          data.nodes.forEach((n: { title: string; kind?: string; content?: string }, i: number) => {
+            const angle = (i / data.nodes.length) * Math.PI * 0.6 - Math.PI * 0.3;
+            const radius = 200;
+            const childId = addNode({
+              title: n.title,
+              kind: (["concept", "question", "action", "idea", "resource", "goal"].includes(n.kind as string) ? n.kind : "concept") as NodeKind,
+              content: n.content ?? null,
+              parentId: parent.id,
+              x: parent.x + parent.width + 80 + Math.cos(angle) * radius * 0.3,
+              y: parent.y + (parent.height / 2) + Math.sin(angle) * radius,
+              width: parent.width,
+              height: parent.height,
+            });
+            if (childId) {
+              newIds.push(childId);
+              addEdge(parent.id, childId);
+            }
+          });
+          if (newIds.length > 0) {
+            selectNodes(newIds[0]);
+            focusNode(newIds[0]);
+          }
+          toast({
+            title: `${data.nodes.length} sub-nós criados`,
+            description: "Conteúdo baseado no tema foi adicionado.",
+            variant: "success",
+          });
+        } else {
+          toast({
+            title: "Erro ao pesquisar",
+            description: data.error ?? "Não foi possível obter conteúdo.",
+            variant: "error",
+          });
+        }
+      } catch {
+        toast({
+          title: "Erro de conexão",
+          description: "Não foi possível contactar o serviço de IA.",
+          variant: "error",
+        });
+      }
+      setWebResearching(null);
+    },
+    [nodes, pushHistory, addNode, addEdge, selectNodes, focusNode, toast]
+  );
+
   const handleContextToggleCollapse = useCallback(
     (nodeId: string) => {
       toggleCollapse(nodeId);
@@ -1258,6 +1375,8 @@ export function MindMapCanvas({ onOpenNodeEditor, onOpenAIPanel, readOnly = fals
         onColorChange={handleContextColorChange}
         onIconChange={handleContextIconChange}
         onDelete={handleContextDelete}
+        onAddChild={handleContextAddChild}
+        onAddChildWeb={handleContextAddChildWeb}
       />
 
       {/* Delete-confirmation dialog (only shown when confirmDelete is on) */}
